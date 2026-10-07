@@ -399,8 +399,7 @@
       }
       const { structured, notes, cached, miss } = resp.result;
       if (miss) { showRules(); return; }
-      const fixedNote = notes && notes.length ? { noteTitle: "Fixed automatically", noteText: "The AI's layout is kept. These spots were corrected using the question's own words:", notes } : {};
-      ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked", ...fixedNote });
+      ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked" });
       remember(sig, q, "ai");
     });
   }

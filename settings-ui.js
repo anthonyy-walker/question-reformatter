@@ -101,7 +101,7 @@
             h("li", { text: "Every math expression is still there, unchanged, and none are invented." }),
             h("li", { text: "Every negation word from the original is still there." }),
             h("li", { text: "The answer choices are unchanged and in the same order." })),
-          h("p.qr-help", { text: "If a check fails, the AI's layout is never thrown away. The AI is asked once to fix its own mistake. Anything still wrong is fixed automatically by putting back the question's own sentence, and a note lists what was fixed." }),
+          h("p.qr-help", { text: "If a check fails, the AI's layout is never thrown away. The AI is asked once to fix its own mistake. Anything still wrong is fixed automatically by putting back the question's own sentence." }),
           h("div", {}, copyBtn)));
       }
 

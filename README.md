@@ -31,7 +31,6 @@ It changes the **layout**, never the **content**. It never solves, hints, or reo
   - The AI's layout is never thrown away. If a check fails:
     1. The AI is asked once to fix its own mistake.
     2. Anything still wrong is patched with the question's own sentence (left-out lines put back, invented lines removed, answer choices always the originals).
-    3. A short "Fixed automatically" note lists what changed.
 
 ## Saved results (no repeat cost)
 - Every AI result that passes the safety check is saved on this device.
