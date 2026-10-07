@@ -134,7 +134,7 @@
     const missing = [], added = [];
     const a = multiset(before), b = multiset(after);
     a.forEach((n, k) => { if ((b.get(k) || 0) < n) missing.push(k); });
-    b.forEach((n, k) => { if ((a.get(k) || 0) < n) added.push(k); });
+    b.forEach((n, k) => { if (!a.has(k)) added.push(k); }); // repeating something from the question is fine; inventing is not
     return { missing, added };
   }
   const allText = (s) => [...(s.task || []), ...(s.given || []), ...(s.context || []), ...(s.choices || [])].join(" \n ");
@@ -165,6 +165,105 @@
     return warnings;
   }
 
-  root.QRFormatter = { splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
+
+  // ---------- automatic repair ----------
+  // Never throws the AI's layout away. Instead it patches only the spots that
+  // broke a rule, using the question's own sentences, until every check passes.
+  //   1. Answer choices: always the original ones, word for word.
+  //   2. A line with a number or math that is NOT in the question: removed.
+  //   3. Anything left out (number, math, meaning-changing word): the original
+  //      sentence that contains it replaces the AI line most like it, or is added.
+  const words = (t) => new Set(plain(t).toLowerCase().match(/[a-z0-9.]{3,}/g) || []);
+  function overlap(a, b) {
+    const A = words(a), B = words(b);
+    if (!A.size || !B.size) return 0;
+    let n = 0; A.forEach((w) => { if (B.has(w)) n++; });
+    return n / Math.min(A.size, B.size);
+  }
+
+  function repair(originalText, originalChoices, structured) {
+    const out = { ...structured, task: [...(structured.task || [])], given: [...(structured.given || [])], context: [...(structured.context || [])] };
+    const notes = [];
+    const SECTIONS = ["task", "given", "context"];
+    const norm = (c) => normalizeSpace(String(c).replace(TAG_RE, ""));
+
+    // 1. choices
+    const choices = (originalChoices || []).slice();
+    const same = choices.length === (out.choices || []).length && choices.every((c, i) => norm(c) === norm(out.choices[i]));
+    if (!same) notes.push("Used the original answer choices, word for word.");
+    out.choices = choices;
+
+    // 2. remove lines with invented numbers or math
+    const origNums = new Set(extractNumbers(originalText + " " + choices.join(" ")));
+    const origToks = new Set(tokens(originalText + " " + choices.join(" ")));
+    let removed = 0;
+    SECTIONS.forEach((k) => {
+      out[k] = out[k].filter((line) => {
+        const bad = extractNumbers(line).some((n) => !origNums.has(n)) || tokens(line).some((t) => !origToks.has(t));
+        if (bad) removed++;
+        return !bad;
+      });
+    });
+    if (removed) notes.push(`Removed ${removed} line${removed > 1 ? "s" : ""} that had something not in the question.`);
+
+    // 3. put back what was left out
+    const multi = splitParts(normalizeSpace(originalText).replace(/\n/g, " \n"));
+    const sentences = multi ? [...splitSentences(multi.before), ...multi.parts] : splitSentences(originalText);
+    const restored = { numbers: new Set(), math: new Set(), words: new Set() };
+    const lowerNeg = (t) => (plain(t).match(NEGATION_RE) || []).map((w) => w.toLowerCase());
+
+    // A line may only be swapped for the original sentence if the swap loses nothing:
+    // every number, math piece and meaning-changing word in that line is also in the sentence.
+    const contained = (line, source) => {
+      const sn = extractNumbers(source), st = tokens(source), sw = lowerNeg(source);
+      return extractNumbers(line).every((n) => sn.includes(n)) && tokens(line).every((t) => st.includes(t)) && lowerNeg(line).every((w) => sw.includes(w));
+    };
+    const origOrder = (line) => { const i = sentences.findIndex((x) => norm(x) === norm(line)); return i; };
+
+    for (let round = 0; round < 60; round++) {
+      const all = SECTIONS.flatMap((k) => out[k]).join(" \n ") + " \n " + choices.join(" \n ");
+      const origAll = originalText + " \n " + choices.join(" \n ");
+      const missing = [
+        ...diff(extractNumbers(origAll), extractNumbers(all)).missing.map((v) => ["numbers", v, (x) => extractNumbers(x).includes(v)]),
+        ...diff(tokens(origAll), tokens(all)).missing.map((v) => ["math", v, (x) => tokens(x).includes(v)]),
+        ...diff(lowerNeg(origAll), lowerNeg(all)).missing.map((v) => ["words", v, (x) => lowerNeg(x).includes(v)]),
+      ];
+      const fixable = missing.find(([, , has]) => sentences.some(has));
+      if (!fixable) break;
+      const [kind, value, has] = fixable;
+      const present = new Set(SECTIONS.flatMap((k) => out[k]).map(norm));
+      const source = sentences.find((x) => has(x) && !present.has(norm(x))) || sentences.find(has);
+
+      // Swap out the AI line most like the original sentence (only if nothing is lost), otherwise add the sentence.
+      let best = null;
+      SECTIONS.forEach((k) => out[k].forEach((line, i) => {
+        if (norm(line) === norm(source) || !contained(line, source)) return;
+        const score = overlap(line, source);
+        if (score >= 0.3 && (!best || score > best.score)) best = { k, i, score };
+      }));
+      if (best) out[best.k][best.i] = source;
+      else {
+        const k = isTaskSentence(source) ? "task" : extractNumbers(source).length || tokens(source).length ? "given" : "context";
+        // keep the question's order: put it right after the closest earlier original sentence already shown
+        const myIdx = origOrder(source);
+        let at = out[k].length;
+        for (let j = out[k].length - 1; j >= 0; j--) { const o = origOrder(out[k][j]); if (o !== -1 && o < myIdx) { at = j + 1; break; } if (o > myIdx) at = j; }
+        out[k].splice(at, 0, source);
+      }
+      restored[kind].add(value);
+    }
+
+    if (restored.numbers.size) notes.push(`Put back numbers the AI left out: ${[...restored.numbers].join(", ")}.`);
+    if (restored.math.size) notes.push(`Put back ${restored.math.size} math expression${restored.math.size > 1 ? "s" : ""} the AI left out.`);
+    if (restored.words.size) notes.push(`Put back words that change the meaning: ${[...restored.words].join(", ")}.`);
+    if (!out.task.length) {
+      const t = sentences.filter(isTaskSentence);
+      out.task = t.length ? t : sentences.slice(-1);
+      notes.push("Put back the question's task.");
+    }
+    return { structured: out, notes };
+  }
+
+  root.QRFormatter = { repair, splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
   if (typeof module !== "undefined" && module.exports) module.exports = root.QRFormatter;
 })(typeof globalThis !== "undefined" ? globalThis : this);

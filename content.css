@@ -112,6 +112,8 @@
 .qr-panel .qr-loading { color: var(--qr-ink-3); font-style: italic; }
 
 .qr-panel .qr-warn { display: flex; gap: 14px; align-items: flex-start; background: var(--qr-warn-bg); border: 1.5px solid var(--qr-warn-border); color: var(--qr-warn-ink); border-radius: 8px; padding: 14px 16px; }
+.qr-panel .qr-note { display: flex; gap: 14px; align-items: flex-start; background: var(--qr-accent-soft); border: 1.5px solid var(--qr-accent); color: var(--qr-ink); border-radius: 8px; padding: 12px 16px; }
+.qr-panel .qr-note .qr-info-icon { color: var(--qr-accent); }
 .qr-panel .qr-warn-title { font-weight: 700; }
 .qr-panel .qr-warn-text, .qr-panel .qr-warn-list { font-size: var(--qr-text-small); }
 .qr-panel .qr-warn-list { padding-left: 1.2em; list-style: disc; }

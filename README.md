@@ -27,7 +27,11 @@ It changes the **layout**, never the **content**. It never solves, hints, or reo
 - **AI**
   - Needs an Anthropic API key (settings ⚙).
   - Follows strict instructions in `prompt.js`: layout only, no solving, no hints, no method names.
-  - Every AI result is checked automatically. If any number, answer choice, or word like "not" was changed, added or dropped, the AI version is thrown out and the Rules version is shown.
+  - Every AI result is checked automatically: numbers, math, answer choices, and words like "not".
+  - The AI's layout is never thrown away. If a check fails:
+    1. The AI is asked once to fix its own mistake.
+    2. Anything still wrong is patched with the question's own sentence (left-out lines put back, invented lines removed, answer choices always the originals).
+    3. A short "Fixed automatically" note lists what changed.
 
 ## Saved results (no repeat cost)
 - Every AI result that passes the safety check is saved on this device.

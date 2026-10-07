@@ -397,14 +397,11 @@
         showRules({ warnTitle: "Showing the Rules version instead", warnText: "The AI didn't respond:", warnings: [resp ? resp.error : "No response from the extension."] });
         return;
       }
-      const { structured, warnings, cached, miss } = resp.result;
+      const { structured, notes, cached, miss } = resp.result;
       if (miss) { showRules(); return; }
-      if (warnings.length) {
-        showRules({ warnTitle: "Showing the original-words version instead", warnText: "The AI left something out or changed it, so its version was not used. What it got wrong:", warnings });
-      } else {
-        ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked" });
-        remember(sig, q, "ai");
-      }
+      const fixedNote = notes && notes.length ? { noteTitle: "Fixed automatically", noteText: "The AI's layout is kept. These spots were corrected using the question's own words:", notes } : {};
+      ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked", ...fixedNote });
+      remember(sig, q, "ai");
     });
   }
 
@@ -564,6 +561,14 @@
             h("p.qr-warn-title", {}, meta.warnTitle),
             h("p.qr-warn-text", {}, meta.warnText),
             h("ul.qr-warn-list", {}, meta.warnings.map((w) => h("li", {}, w))))));
+      }
+      if (meta.notes && meta.notes.length) {
+        panel.append(h("div.qr-note", { role: "status" },
+          h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
+          h("div", { style: { display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 } },
+            h("p.qr-warn-title", {}, meta.noteTitle),
+            h("p.qr-warn-text", {}, meta.noteText),
+            h("ul.qr-warn-list", {}, meta.notes.map((w) => h("li", {}, w))))));
       }
       const qbox = h("div.qr-box", {});
       if (data.task.length) qbox.append(askedSection());

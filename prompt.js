@@ -73,4 +73,12 @@ ${choiceBlock}
 </answer_choices>`;
 }
 
-if (typeof module !== "undefined" && module.exports) module.exports = { SYSTEM_PROMPT, PROMPT_VERSION, buildUserMessage };
+// Sent once, only if the first answer broke a rule. The AI gets to fix its own layout.
+function buildFixMessage(problems) {
+  return `Your layout broke these rules:
+${problems.map((p) => "- " + p).join("\n")}
+
+Fix ONLY these problems and keep the rest of your layout the same. Put every left-out number, placeholder and word back in the line where it belongs, using the original wording. Return ONLY the corrected JSON object.`;
+}
+
+if (typeof module !== "undefined" && module.exports) module.exports = { SYSTEM_PROMPT, PROMPT_VERSION, buildUserMessage, buildFixMessage };

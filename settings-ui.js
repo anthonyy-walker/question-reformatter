@@ -47,7 +47,7 @@
         h("div.qr-legend", { text: "Default mode" }),
         h("div.qr-mode-grid", {}, [
           ["rules", "Rules", "Keeps the original words. Splits the question by sentence. No AI, nothing leaves your browser."],
-          ["ai", "AI", "Restructures the layout under strict rules, then is checked against the original before it shows. Results are saved, so each question is only paid for once."],
+          ["ai", "AI", "Restructures the layout under strict rules. Anything it gets wrong is fixed automatically before it shows. Results are saved, so each question is only paid for once."],
         ].map(([k, name, desc]) => {
           const on = draft.mode === k;
           return h(`button.qr-btn.qr-mode${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.mode = k; render(); } },
@@ -97,11 +97,11 @@
           h("pre.qr-pre", { text: SYSTEM_PROMPT }),
           h("div.qr-instr-head", { text: "Checked by the extension before anything is shown" }),
           h("ul.qr-ul", {},
-            h("li", { text: "Every number in the result appears in the original question, and none are added." }),
-            h("li", { text: "Every math expression is still there, unchanged, and none are added." }),
+            h("li", { text: "Every number from the question is still there, and none are invented." }),
+            h("li", { text: "Every math expression is still there, unchanged, and none are invented." }),
             h("li", { text: "Every negation word from the original is still there." }),
             h("li", { text: "The answer choices are unchanged and in the same order." })),
-          h("p.qr-help", { text: "If any check fails, the Rules version is shown instead, with a note listing what failed." }),
+          h("p.qr-help", { text: "If a check fails, the AI's layout is never thrown away. The AI is asked once to fix its own mistake. Anything still wrong is fixed automatically by putting back the question's own sentence, and a note lists what was fixed." }),
           h("div", {}, copyBtn)));
       }
 

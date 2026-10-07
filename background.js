@@ -50,27 +50,45 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
     if (hit) {
       hit.lastUsed = Date.now();
       chrome.storage.local.set({ [key]: hit });
-      return { structured: hit.structured, warnings: [], cached: true, savedAt: hit.savedAt };
+      return { structured: hit.structured, notes: hit.notes || [], cached: true, savedAt: hit.savedAt };
     }
   }
 
-  if (cacheOnly) return { miss: true, warnings: [] };
+  if (cacheOnly) return { miss: true };
   if (!apiKey) throw new Error("No API key set. Open Settings to add one.");
-  const structured = await callModel(apiKey, model, text, choices, math);
 
   const mathText = Object.fromEntries((math || []).map((m) => [m.token, m.text]));
-  const warnings = QRFormatter.validate(text, choices, structured, mathText);
+  const check = (s) => QRFormatter.validate(text, choices, s, mathText);
 
-  // Only results that pass every check are saved.
-  if (!warnings.length) {
-    const now = Date.now();
-    await chrome.storage.local.set({ [key]: { structured, savedAt: now, lastUsed: now } });
-    prune();
+  // 1) First try.
+  const messages = [{ role: "user", content: buildUserMessage(text, choices, math) }];
+  let { structured, raw } = await callModel(apiKey, model, messages);
+  let problems = check(structured);
+  let notes = [];
+
+  // 2) If it broke a rule, the AI gets one chance to fix its own layout.
+  if (problems.length) {
+    try {
+      const second = await callModel(apiKey, model, [...messages, { role: "assistant", content: raw }, { role: "user", content: buildFixMessage(problems) }]);
+      if (check(second.structured).length < problems.length) structured = second.structured;
+    } catch (_) { /* keep the first layout and repair it below */ }
+    problems = check(structured);
   }
-  return { structured, warnings, cached: false };
+
+  // 3) Anything still wrong is patched with the question's own sentences. The layout is never thrown away.
+  if (problems.length) {
+    const fixed = QRFormatter.repair(text, choices, structured);
+    structured = fixed.structured;
+    notes = fixed.notes;
+  }
+
+  const now = Date.now();
+  await chrome.storage.local.set({ [key]: { structured, notes, savedAt: now, lastUsed: now } });
+  prune();
+  return { structured, notes, remaining: check(structured), cached: false };
 }
 
-async function callModel(apiKey, model, text, choices, math) {
+async function callModel(apiKey, model, messages) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -84,7 +102,7 @@ async function callModel(apiKey, model, text, choices, math) {
       max_tokens: 2000,
       temperature: 0,
       system: SYSTEM_PROMPT,
-      messages: [{ role: "user", content: buildUserMessage(text, choices, math) }],
+      messages,
     }),
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${(await res.text()).slice(0, 200)}`);
@@ -93,7 +111,7 @@ async function callModel(apiKey, model, text, choices, math) {
   const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
   const arr = (x) => (Array.isArray(x) ? x.map(String) : []);
-  return { source: "ai", task: arr(parsed.task), given: arr(parsed.given), context: arr(parsed.context), choices: arr(parsed.choices) };
+  return { raw, structured: { source: "ai", task: arr(parsed.task), given: arr(parsed.given), context: arr(parsed.context), choices: arr(parsed.choices) } };
 }
 
 // ---------- housekeeping ----------
