@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Question Reformatter",
-  "version": "0.3.1",
-  "description": "Restructures dense assignment questions into a broken-down, scannable layout. Never solves or hints.",
+  "version": "0.4.0",
+  "description": "Rewrites dense Gradescope questions in plain, simple language with a broken-down layout. Never solves or hints.",
   "permissions": ["storage"],
   "host_permissions": [
     "https://www.gradescope.com/*",

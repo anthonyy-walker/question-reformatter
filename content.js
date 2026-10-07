@@ -240,6 +240,16 @@
   }
 
   // Walks an element and returns text with ⟦Mn⟧ for math and <b>/<i> for emphasis.
+  // Screen-reader-only labels like "choice 1 of 3" are not part of the question.
+  function isHiddenText(el) {
+    if (/\b(sr-only|visually-?hidden|screen-?reader|a11y-?hidden|offscreen)\b/i.test(el.className || "")) return true;
+    if (el.getAttribute && el.getAttribute("aria-hidden") === "true" && !el.closest(".katex,.MathJax,mjx-container")) return true;
+    const cs = getComputedStyle(el);
+    if (cs.display === "none" || cs.visibility === "hidden") return true;
+    if (cs.position === "absolute" && (parseFloat(cs.width) <= 1 || parseFloat(cs.height) <= 1) && cs.overflow === "hidden") return true;
+    return false;
+  }
+
   function extractRich(rootEl, { skip, math }) {
     let out = "";
     (function walk(n) {
@@ -254,6 +264,7 @@
       const el = n;
       if (skip && skip.has(el)) return;
       if (el.matches("[data-qr], input, button, textarea, select, style, noscript, svg")) return;
+      if (isHiddenText(el)) return;
       if (el.tagName === "SCRIPT") {
         // Un-rendered MathJax 2 source (no rendered copy next to it).
         if (/math\/tex/.test(el.type) && !(el.previousElementSibling && /MathJax/.test(el.previousElementSibling.className))) {
@@ -285,6 +296,8 @@
       .replace(/[ \t ]+/g, " ")
       .replace(/ *\n */g, "\n")
       .split("\n")
+      .map((line) => line.replace(/\bchoice\s+\d+\s+of\s+\d+\b[:.]?/gi, "").trim())  // "choice 1 of 3"
+      .filter(Boolean)
       .filter((line) => !/^\s*(<[bi]>)*\s*\d+(\.\d+)?\s+points?\s*(<\/[bi]>)*\s*$/i.test(line))  // "2 Points"
       .filter((line, i) => !(i < 2 && /^\s*(<[bi]>)*\s*Q\d+(\.\d+)*\b/.test(line) && F.plain(line).length < 90)) // "Q1 Scenario 1" title
       .join("\n")
@@ -381,7 +394,7 @@
     const ctrl = makePanel(q, read, () => { panels.delete(q); forget(sig); });
     panels.set(q, ctrl);
 
-    const rules = F.ruleFormat(read.text, read.choices);
+    const rules = F.rulesToSimple(F.ruleFormat(read.text, read.choices));
     const showRules = (extra) => { ctrl.show(rules, { label: "Rules · original words", ...extra }); remember(sig, q, "rules"); };
     if (mode !== "ai") { showRules(); return; }
 
@@ -399,7 +412,7 @@
       }
       const { structured, notes, cached, miss } = resp.result;
       if (miss) { showRules(); return; }
-      ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked" });
+      ctrl.show(structured.sections ? structured : F.rulesToSimple(structured), {});
       remember(sig, q, "ai");
     });
   }
@@ -411,7 +424,7 @@
     const panel = rootAttrs(h("div.qr-panel", { role: "region", "aria-label": "Reformatted view of " + read.title }), false);
     q.parentNode.insertBefore(panel, q);
 
-    let data = null, meta = {}, pending = null, part = 0;
+    let data = null, meta = {}, pending = null, part = 0, showOriginal = false;
 
     const inputListener = () => data && draw();
     read.choiceInfo.forEach((c) => c.input.addEventListener("change", inputListener));
@@ -424,8 +437,9 @@
 
     function header() {
       return h("div.qr-header", {},
-        h("span.qr-qlabel", {}, `Reformatted · ${read.title}` + (meta.label ? ` · ${meta.label}` : "")),
-        h("div.qr-header-actions", {}, h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, "✕")));
+        h("div.qr-header-actions", {},
+          data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
+          h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, "✕")));
     }
 
     function loading() {
@@ -478,13 +492,23 @@
       if (last < text.length) target.append(document.createTextNode(text.slice(last)));
     }
 
-    const row = (str, cls = "") => h("div.qr-row", {}, h("span.qr-mark", { "aria-hidden": "true" }, "◦"), h(`span.qr-text${cls}`, {}, rich(str)));
+    const row = (str, mark = "◦", cls = "") => h(`div.qr-row${cls}`, {}, h("span.qr-mark", { "aria-hidden": "true" }, mark), h("span.qr-text", {}, rich(str)));
     const label = (txt) => h("div.qr-label", {}, h("span", { "aria-hidden": "true" }, "•"), h("span", {}, txt));
 
-    function askedSection() {
-      const parts = data.task.length >= 2 && data.task.every((t) => /^(<[bi]>)*\(([a-h])\)/.test(t)) ? data.task : null;
-      const sec = h("section.qr-sec", { "aria-label": "What you're asked" }, label("What you're asked"));
-      if (!parts) { data.task.forEach((t) => sec.append(row(t))); return sec; }
+    function section(heading, points) {
+      const sec = h("section.qr-sec", { "aria-label": heading }, label(heading));
+      points.forEach((p) => {
+        sec.append(row(p.text));
+        (p.sub || []).forEach((x) => sec.append(row(x, "▪", ".qr-sub")));
+      });
+      return sec;
+    }
+
+    function questionSection() {
+      const items = data.question || [];
+      const parts = items.length >= 2 && items.every((t) => /^(<[bi]>)*\(([a-h])\)/.test(t)) ? items : null;
+      const sec = h("section.qr-sec", { "aria-label": "The question" }, label("The question"));
+      if (!parts) { items.forEach((t) => sec.append(row(t))); return sec; }
 
       part = Math.min(part, parts.length - 1);
       const letterOf = (t) => t.match(/\(([a-h])\)/)[1];
@@ -501,6 +525,7 @@
       return sec;
     }
 
+    const allStrings = () => [...F.simpleLines(data), data.choices_intro || "", ...data.choices];
     function symbolsSection() {
       const used = new Set((allStrings().join(" ").match(F.TOKEN_RE) || []));
       const text = read.math.filter((m) => used.has(m.token)).map((m) => m.text).join(" ");
@@ -509,14 +534,14 @@
       return h("section.qr-sec", { "aria-label": "Symbols" }, label("Symbols — how to say them"),
         h("div.qr-symbols", {}, gloss.map(([sym, say]) => h("span.qr-sym", {}, h("span.qr-sym-glyph", {}, sym), `“${say}”`))));
     }
-    const allStrings = () => [...data.task, ...data.given, ...data.context, ...data.choices];
 
     function choicesSection() {
-      const sec = h("section.qr-sec", { "aria-label": "Answer choices" }, label("Answer choices"));
+      const sec = h("section.qr-sec", { "aria-label": "The answer choices" }, label("The answer choices"));
       if (!data.choices.length) {
         sec.append(h("p.qr-empty", {}, "Written answer. Type it in the answer box on the page."));
         return h("div.qr-box", {}, sec);
       }
+      if (data.choices_intro) sec.append(row(data.choices_intro));
       const list = h("div.qr-choices", {});
       data.choices.forEach((c, i) => {
         const letter = String.fromCharCode(65 + i);
@@ -541,6 +566,13 @@
       return h("div.qr-box", {}, sec);
     }
 
+    function originalSection() {
+      const sec = h("section.qr-sec", { "aria-label": "Original wording" }, label("Original wording"));
+      read.text.split("\n").filter((l) => F.plain(l).trim()).forEach((l) => sec.append(row(l)));
+      read.choices.forEach((c, i) => sec.append(row(c, String.fromCharCode(65 + i) + ".")));
+      return h("div.qr-box.qr-original", {}, sec);
+    }
+
     function selectOnPage(info, letter) {
       pending = null;
       info.input.click();
@@ -561,28 +593,12 @@
             h("p.qr-warn-text", {}, meta.warnText),
             h("ul.qr-warn-list", {}, meta.warnings.map((w) => h("li", {}, w))))));
       }
-      if (meta.notes && meta.notes.length) {
-        panel.append(h("div.qr-note", { role: "status" },
-          h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
-          h("div", { style: { display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 } },
-            h("p.qr-warn-title", {}, meta.noteTitle),
-            h("p.qr-warn-text", {}, meta.noteText),
-            h("ul.qr-warn-list", {}, meta.notes.map((w) => h("li", {}, w))))));
-      }
+      if (showOriginal) panel.append(originalSection());
       const qbox = h("div.qr-box", {});
-      if (data.task.length) qbox.append(askedSection());
-      if (data.given.length) {
-        const g = h("section.qr-sec", { "aria-label": "Given" }, label("Given"));
-        data.given.forEach((t) => g.append(row(t)));
-        qbox.append(g);
-      }
-      const c = h("section.qr-sec", { "aria-label": "Context" }, label("Context"));
-      if (data.context.length) data.context.forEach((t) => c.append(row(t)));
-      else c.append(h("p.qr-empty", {}, "No background in this question."));
-      qbox.append(c);
+      (data.sections || []).forEach((sec) => { if (sec.points && sec.points.length) qbox.append(section(sec.heading || "Details", sec.points)); });
+      if ((data.question || []).length) qbox.append(questionSection());
       const sym = symbolsSection(); if (sym) qbox.append(sym);
       panel.append(qbox, choicesSection());
-      // keep keyboard focus where it was
       if (focusedLabel) { const b = [...panel.querySelectorAll("button")].find((x) => x.textContent === focusedLabel); if (b) b.focus(); }
     }
 

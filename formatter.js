@@ -264,6 +264,133 @@
     return { structured: out, notes };
   }
 
-  root.QRFormatter = { repair, splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
+  // ---------- plain-language rewrite (AI mode) ----------
+  // Shape: { sections:[{heading, points:[{text, sub:[…]}]}], question:[…], choices_intro, choices:[…] }
+
+  // Only the words that flip meaning. Contractions count ("isn't" = "is not").
+  const STRICT_NEG_RE = /\b(not|never|except|none|incorrect|false|cannot|at least|at most|fewer than|more than|no more than|no less than)\b/gi;
+  function strictNeg(t) {
+    const p = plain(t).replace(/\bcan['’]t\b/gi, "cannot").replace(/\bwon['’]t\b/gi, "will not").replace(/n['’]t\b/gi, " not");
+    return (p.match(STRICT_NEG_RE) || []).map((w) => w.toLowerCase());
+  }
+  // Numbers used only as labels ("Step 2", "Choice 1") are not facts.
+  const outNumbers = (t) => extractNumbers(String(t || "").replace(/\b(step|choice|part|claim|question|q)\s*\d+\b/gi, "$1"));
+
+  function simpleLines(s) {
+    const out = [];
+    (s.sections || []).forEach((sec) => {
+      if (sec.heading) out.push(sec.heading);
+      (sec.points || []).forEach((p) => { out.push(p.text || ""); (p.sub || []).forEach((x) => out.push(x)); });
+    });
+    (s.question || []).forEach((x) => out.push(x));
+    return out;
+  }
+
+  function checkSimple(originalText, originalChoices, s, mathText) {
+    const problems = [];
+    const choices = originalChoices || [];
+    const origAll = originalText + " \n " + choices.join(" \n ");
+    const outAll = [...simpleLines(s), s.choices_intro || "", ...(s.choices || [])].join(" \n ");
+    const allowed = new Set([...extractNumbers(origAll), ...Object.values(mathText || {}).flatMap((t) => extractNumbers(t))]);
+    const show = (tok) => (mathText && mathText[tok] ? mathText[tok] : tok);
+
+    const nums = diff(extractNumbers(origAll), outNumbers(outAll));
+    if (nums.missing.length) problems.push(`Left out these numbers from the question: ${nums.missing.join(", ")}`);
+    const invented = [...new Set(outNumbers(outAll).filter((n) => !allowed.has(n)))];
+    if (invented.length) problems.push(`Added numbers that are not in the question: ${invented.join(", ")}`);
+
+    const origToks = new Set(tokens(origAll)), outToks = new Set(tokens(outAll));
+    const lostToks = [...origToks].filter((t) => !outToks.has(t));
+    if (lostToks.length) problems.push(`Left out this math: ${lostToks.map(show).join(" ; ")}`);
+    const newToks = [...outToks].filter((t) => !origToks.has(t));
+    if (newToks.length) problems.push(`Invented math placeholders: ${newToks.join(", ")}`);
+
+    const negs = diff(strictNeg(origAll), strictNeg(outAll));
+    if (negs.missing.length) problems.push(`Dropped words that change the meaning: ${negs.missing.join(", ")}`);
+
+    if (!(s.question || []).filter((q) => plain(q).trim()).length) problems.push("Left out the question itself.");
+
+    if (choices.length) {
+      if ((s.choices || []).length !== choices.length) problems.push(`Gave ${(s.choices || []).length} answer choices instead of ${choices.length}.`);
+      else choices.forEach((c, i) => {
+        const mine = (s.choices_intro || "") + " " + s.choices[i];
+        const ok = extractNumbers(c).every((n) => outNumbers(mine).includes(n)) &&
+          tokens(c).every((t) => tokens(mine).includes(t)) &&
+          strictNeg(c).every((w) => strictNeg(mine).includes(w)) &&
+          outNumbers(s.choices[i]).every((n) => extractNumbers(c).includes(n) || allowed.has(n));
+        if (!ok) problems.push(`Answer choice ${String.fromCharCode(65 + i)} lost or changed something.`);
+      });
+    }
+    return problems;
+  }
+
+  // Keeps the AI's rewrite and patches only what broke a rule, using the question's own words.
+  function repairSimple(originalText, originalChoices, s, mathText) {
+    const choices = originalChoices || [];
+    const out = {
+      source: "ai",
+      sections: (s.sections || []).map((sec) => ({ heading: sec.heading || "", points: (sec.points || []).map((p) => ({ text: p.text || "", sub: [...(p.sub || [])] })) })),
+      question: [...(s.question || [])],
+      choices_intro: s.choices_intro || "",
+      choices: [...(s.choices || [])],
+    };
+    const origAll = originalText + " \n " + choices.join(" \n ");
+    const allowed = new Set([...extractNumbers(origAll), ...Object.values(mathText || {}).flatMap((t) => extractNumbers(t))]);
+    const origToks = new Set(tokens(origAll));
+    const clean = (t) => outNumbers(t).every((n) => allowed.has(n)) && tokens(t).every((x) => origToks.has(x));
+
+    // 1. Answer choices: any choice that lost or changed something goes back to the original wording.
+    if (out.choices.length !== choices.length) { out.choices = choices.slice(); out.choices_intro = ""; }
+    else {
+      const bad = choices.map((c, i) => checkSimple("", [c], { question: ["x"], choices_intro: out.choices_intro, choices: [out.choices[i]] }, mathText).length > 0);
+      if (bad.some(Boolean)) {
+        if (out.choices_intro) { out.choices = choices.slice(); out.choices_intro = ""; }
+        else out.choices = out.choices.map((c, i) => (bad[i] ? choices[i] : c));
+      }
+    }
+
+    // 2. Lines with invented numbers or math are removed.
+    out.sections.forEach((sec) => {
+      sec.points = sec.points.filter((p) => clean(p.text)).map((p) => ({ ...p, sub: p.sub.filter(clean) }));
+    });
+    out.sections = out.sections.filter((sec) => sec.points.length);
+    out.question = out.question.filter((q) => clean(q) && plain(q).trim());
+
+    // 3. If the question itself is missing, use the original question sentence(s).
+    const multi = splitParts(normalizeSpace(originalText).replace(/\n/g, " \n"));
+    const sentences = multi ? [...splitSentences(multi.before), ...multi.parts] : splitSentences(originalText);
+    if (!out.question.length) {
+      const t = multi ? multi.parts : sentences.filter(isTaskSentence);
+      out.question = t.length ? t : sentences.slice(-1);
+    }
+
+    // 4. Anything still left out: add the original sentence under "Also in the question".
+    const extra = [];
+    for (let round = 0; round < 60; round++) {
+      const problems = checkSimple(originalText, choices, { ...out, sections: [...out.sections, { heading: "", points: extra.map((t) => ({ text: t, sub: [] })) }] }, mathText);
+      if (!problems.length) break;
+      const outAll = [...simpleLines(out), ...extra, out.choices_intro, ...out.choices].join(" \n ");
+      const lostNum = diff(extractNumbers(origAll), outNumbers(outAll)).missing[0];
+      const lostTok = [...origToks].find((t) => !tokens(outAll).includes(t));
+      const lostNeg = diff(strictNeg(origAll), strictNeg(outAll)).missing[0];
+      const has = lostNum ? (x) => extractNumbers(x).includes(lostNum) : lostTok ? (x) => tokens(x).includes(lostTok) : lostNeg ? (x) => strictNeg(x).includes(lostNeg) : null;
+      if (!has) break;
+      const src = sentences.find((x) => has(x) && !extra.includes(x));
+      if (!src) break;
+      extra.push(src);
+    }
+    if (extra.length) out.sections.push({ heading: "Also in the question", points: extra.map((t) => ({ text: t, sub: [] })) });
+    return out;
+  }
+
+  // Rules-mode output in the same shape, so one renderer handles both.
+  function rulesToSimple(r) {
+    const sections = [];
+    if (r.given && r.given.length) sections.push({ heading: "Given", points: r.given.map((t) => ({ text: t, sub: [] })) });
+    if (r.context && r.context.length) sections.push({ heading: "Context", points: r.context.map((t) => ({ text: t, sub: [] })) });
+    return { source: "rules", sections, question: r.task || [], choices_intro: "", choices: r.choices || [] };
+  }
+
+  root.QRFormatter = { checkSimple, repairSimple, rulesToSimple, simpleLines, repair, splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
   if (typeof module !== "undefined" && module.exports) module.exports = root.QRFormatter;
 })(typeof globalThis !== "undefined" ? globalThis : this);

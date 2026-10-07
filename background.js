@@ -58,7 +58,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
   if (!apiKey) throw new Error("No API key set. Open Settings to add one.");
 
   const mathText = Object.fromEntries((math || []).map((m) => [m.token, m.text]));
-  const check = (s) => QRFormatter.validate(text, choices, s, mathText);
+  const check = (s) => QRFormatter.checkSimple(text, choices, s, mathText);
 
   // 1) First try.
   const messages = [{ role: "user", content: buildUserMessage(text, choices, math) }];
@@ -77,9 +77,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
 
   // 3) Anything still wrong is patched with the question's own sentences. The layout is never thrown away.
   if (problems.length) {
-    const fixed = QRFormatter.repair(text, choices, structured);
-    structured = fixed.structured;
-    notes = fixed.notes;
+    structured = QRFormatter.repairSimple(text, choices, structured, mathText);
   }
 
   const now = Date.now();
@@ -111,7 +109,11 @@ async function callModel(apiKey, model, messages) {
   const raw = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
   const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));
   const arr = (x) => (Array.isArray(x) ? x.map(String) : []);
-  return { raw, structured: { source: "ai", task: arr(parsed.task), given: arr(parsed.given), context: arr(parsed.context), choices: arr(parsed.choices) } };
+  const sections = (Array.isArray(parsed.sections) ? parsed.sections : []).map((sec) => ({
+    heading: String(sec.heading || ""),
+    points: (Array.isArray(sec.points) ? sec.points : []).map((p) => (typeof p === "string" ? { text: p, sub: [] } : { text: String(p.text || ""), sub: arr(p.sub) })),
+  }));
+  return { raw, structured: { source: "ai", sections, question: arr(parsed.question), choices_intro: String(parsed.choices_intro || ""), choices: arr(parsed.choices) } };
 }
 
 // ---------- housekeeping ----------

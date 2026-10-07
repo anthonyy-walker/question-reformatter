@@ -2,7 +2,9 @@
 
 A Chrome extension that breaks dense Gradescope questions into a calm, scannable layout — **what you're asked → given → context → answer choices** — for students with dyslexia, autism, ADHD, or anyone who loses the question inside a long paragraph.
 
-It changes the **layout**, never the **content**. It never solves, hints, or reorders answers.
+- **Rules mode** keeps the original words and only re-groups them.
+- **AI mode** rewrites the question in plain, simple language: short points under clear headings, steps in order, symbols explained in plain words.
+- Either way it never solves, hints, rules out choices, or reorders answers. "Show original wording" puts the exact original right above.
 
 ## Install (Chrome)
 1. Unzip this folder somewhere you'll keep it.
@@ -26,11 +28,11 @@ It changes the **layout**, never the **content**. It never solves, hints, or reo
   - Only splits, regroups and highlights the original words.
 - **AI**
   - Needs an Anthropic API key (settings ⚙).
-  - Follows strict instructions in `prompt.js`: layout only, no solving, no hints, no method names.
+  - Follows strict instructions in `prompt.js`: simpler words and structure, same facts. No solving, no calculating, no methods, no hints.
   - Every AI result is checked automatically: numbers, math, answer choices, and words like "not".
-  - The AI's layout is never thrown away. If a check fails:
+  - The AI's rewrite is never thrown away. If a check fails:
     1. The AI is asked once to fix its own mistake.
-    2. Anything still wrong is patched with the question's own sentence (left-out lines put back, invented lines removed, answer choices always the originals).
+    2. Anything still wrong is patched: lines with invented numbers are removed, anything left out is added back in the question's own words, and any answer choice that lost something goes back to its original wording.
 
 ## Saved results (no repeat cost)
 - Every AI result that passes the safety check is saved on this device.
