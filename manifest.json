@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Question Reformatter",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Restructures dense assignment questions into a broken-down, scannable layout. Never solves or hints.",
   "permissions": ["storage"],
   "host_permissions": [

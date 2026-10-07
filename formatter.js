@@ -147,20 +147,20 @@
     const newAll = allText(structured);
 
     const nums = diff(extractNumbers(origAll), extractNumbers(newAll));
-    if (nums.missing.length) warnings.push(`Numbers missing: ${nums.missing.join(", ")}`);
-    if (nums.added.length) warnings.push(`Numbers that are not in the original: ${nums.added.join(", ")}`);
+    if (nums.missing.length) warnings.push(`Left out these numbers from the question: ${nums.missing.join(", ")}`);
+    if (nums.added.length) warnings.push(`Added numbers that are not in the question: ${nums.added.join(", ")}`);
 
     const maths = diff(tokens(origAll), tokens(newAll));
-    if (maths.missing.length) warnings.push(`Math missing: ${maths.missing.map(show).join(" ; ")}`);
-    if (maths.added.length) warnings.push(`Math repeated or invented: ${maths.added.map(show).join(" ; ")}`);
+    if (maths.missing.length) warnings.push(`Left out this math: ${maths.missing.map(show).join(" ; ")}`);
+    if (maths.added.length) warnings.push(`Repeated or invented this math: ${maths.added.map(show).join(" ; ")}`);
 
     const norm = (c) => normalizeSpace(String(c).replace(TAG_RE, ""));
     const a = (originalChoices || []).map(norm), b = (structured.choices || []).map(norm);
-    if (a.length !== b.length || a.some((c, i) => c !== b[i])) warnings.push("Answer choices were changed or reordered.");
+    if (a.length !== b.length || a.some((c, i) => c !== b[i])) warnings.push("Changed or reordered the answer choices.");
 
     const neg = (t) => (plain(t).match(NEGATION_RE) || []).map((w) => w.toLowerCase());
     const negs = diff(neg(origAll), neg(newAll));
-    if (negs.missing.length) warnings.push(`Meaning-changing words dropped: ${negs.missing.join(", ")}`);
+    if (negs.missing.length) warnings.push(`Dropped words that change the meaning: ${negs.missing.join(", ")}`);
 
     return warnings;
   }

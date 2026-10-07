@@ -284,7 +284,10 @@
       .replace(/<([bi])>(\s*)<\/\1>/g, "$2")
       .replace(/[ \t ]+/g, " ")
       .replace(/ *\n */g, "\n")
-      .split("\n").filter((line) => !/^\s*(<[bi]>)*\s*\d+(\.\d+)?\s+points?\s*(<\/[bi]>)*\s*$/i.test(line)).join("\n")
+      .split("\n")
+      .filter((line) => !/^\s*(<[bi]>)*\s*\d+(\.\d+)?\s+points?\s*(<\/[bi]>)*\s*$/i.test(line))  // "2 Points"
+      .filter((line, i) => !(i < 2 && /^\s*(<[bi]>)*\s*Q\d+(\.\d+)*\b/.test(line) && F.plain(line).length < 90)) // "Q1 Scenario 1" title
+      .join("\n")
       .replace(/\n{2,}/g, "\n")
       .trim();
   }
@@ -397,7 +400,7 @@
       const { structured, warnings, cached, miss } = resp.result;
       if (miss) { showRules(); return; }
       if (warnings.length) {
-        showRules({ warnTitle: "Showing the Rules version instead", warnText: "The AI version didn't pass the check:", warnings });
+        showRules({ warnTitle: "Showing the original-words version instead", warnText: "The AI left something out or changed it, so its version was not used. What it got wrong:", warnings });
       } else {
         ctrl.show(structured, { label: cached ? "AI · checked · saved, no new cost" : "AI · checked" });
         remember(sig, q, "ai");
