@@ -1,0 +1,32 @@
+{
+  "manifest_version": 3,
+  "name": "Question Reformatter",
+  "version": "0.2.0",
+  "description": "Restructures dense assignment questions into a broken-down, scannable layout. Never solves or hints.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.gradescope.com/*",
+    "https://api.anthropic.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.gradescope.com/*"],
+      "js": ["prompt.js", "math.js", "formatter.js", "settings-ui.js", "content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["fonts/*.woff2"],
+      "matches": ["https://www.gradescope.com/*"]
+    }
+  ],
+  "options_page": "options.html",
+  "action": {
+    "default_title": "Question Reformatter settings"
+  }
+}
