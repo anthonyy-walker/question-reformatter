@@ -1,6 +1,8 @@
-# Question Reformatter (v0.2)
+# Question Reformatter
 
-Breaks dense Gradescope questions into a scannable layout. It never solves or hints.
+A Chrome extension that breaks dense Gradescope questions into a calm, scannable layout — **what you're asked → given → context → answer choices** — for students with dyslexia, autism, ADHD, or anyone who loses the question inside a long paragraph.
+
+It changes the **layout**, never the **content**. It never solves, hints, or reorders answers.
 
 ## Install (Chrome)
 1. Unzip this folder somewhere you'll keep it.
@@ -41,7 +43,7 @@ Breaks dense Gradescope questions into a scannable layout. It never solves or hi
 - The AI sees math as placeholders (⟦M1⟧) and must copy them exactly. If it changes, drops or writes out any math, the AI version is rejected.
 
 ## Before using on graded work
-- Get approval from your instructor and SSD.
+- Get approval from your instructor and your school's disability services office.
 - Show them the settings page → "Show the exact instructions the AI gets".
 
 ## Files
