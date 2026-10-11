@@ -1,32 +1,47 @@
 {
   "manifest_version": 3,
   "name": "Question Reformatter",
-  "version": "0.4.0",
-  "description": "Rewrites dense Gradescope questions in plain, simple language with a broken-down layout. Never solves or hints.",
-  "permissions": ["storage"],
+  "version": "0.5.0",
+  "description": "Rewrites dense text in plain, simple language \u2014 Gradescope questions and long paragraphs on any website. Never solves or hints.",
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
-    "https://www.gradescope.com/*",
-    "https://api.anthropic.com/*"
+    "<all_urls>"
   ],
   "background": {
     "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["https://www.gradescope.com/*"],
-      "js": ["prompt.js", "math.js", "formatter.js", "settings-ui.js", "content.js"],
-      "css": ["content.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "prompt.js",
+        "math.js",
+        "formatter.js",
+        "settings-ui.js",
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["fonts/*.woff2"],
-      "matches": ["https://www.gradescope.com/*"]
+      "resources": [
+        "fonts/*.woff2"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
     }
   ],
   "options_page": "options.html",
   "action": {
-    "default_title": "Question Reformatter settings"
+    "default_title": "Reformatter settings"
   }
 }

@@ -34,16 +34,19 @@ async function sha256(text) {
 
 // The key covers everything that could change the answer: the instructions'
 // version, the model, the question, the choices, and what each math piece says.
-function cacheKeyInput({ text, choices, math }, model) {
-  return JSON.stringify({ v: PROMPT_VERSION, model, text, choices, math: (math || []).map((m) => [m.token, m.text]) });
+function cacheKeyInput({ text, choices, math, kind }, model) {
+  const v = kind === "reading" ? "r" + READING_PROMPT_VERSION : PROMPT_VERSION;
+  return JSON.stringify({ v, kind, model, text, choices, math: (math || []).map((m) => [m.token, m.text]) });
 }
 
 // ---------- main flow ----------
 
-async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
+async function reformat({ text, choices, math, forceFresh, cacheOnly, kind }) {
+  const reading = kind === "reading";
+  choices = reading ? [] : choices || [];
   const { apiKey, model: chosen } = await chrome.storage.local.get(["apiKey", "model"]);
   const model = chosen || DEFAULT_MODEL;
-  const key = CACHE_PREFIX + (await sha256(cacheKeyInput({ text, choices, math }, model)));
+  const key = CACHE_PREFIX + (await sha256(cacheKeyInput({ text, choices, math, kind }, model)));
 
   if (!forceFresh) {
     const hit = (await chrome.storage.local.get(key))[key];
@@ -58,18 +61,19 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
   if (!apiKey) throw new Error("No API key set. Open Settings to add one.");
 
   const mathText = Object.fromEntries((math || []).map((m) => [m.token, m.text]));
-  const check = (s) => QRFormatter.checkSimple(text, choices, s, mathText);
+  const check = (s) => QRFormatter.checkSimple(text, choices, s, mathText, { reading });
 
   // 1) First try.
-  const messages = [{ role: "user", content: buildUserMessage(text, choices, math) }];
-  let { structured, raw } = await callModel(apiKey, model, messages);
+  const system = reading ? READING_PROMPT : SYSTEM_PROMPT;
+  const messages = [{ role: "user", content: reading ? buildReadingMessage(text, math) : buildUserMessage(text, choices, math) }];
+  let { structured, raw } = await callModel(apiKey, model, messages, system);
   let problems = check(structured);
   let notes = [];
 
   // 2) If it broke a rule, the AI gets one chance to fix its own layout.
   if (problems.length) {
     try {
-      const second = await callModel(apiKey, model, [...messages, { role: "assistant", content: raw }, { role: "user", content: buildFixMessage(problems) }]);
+      const second = await callModel(apiKey, model, [...messages, { role: "assistant", content: raw }, { role: "user", content: buildFixMessage(problems) }], system);
       if (check(second.structured).length < problems.length) structured = second.structured;
     } catch (_) { /* keep the first layout and repair it below */ }
     problems = check(structured);
@@ -77,7 +81,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
 
   // 3) Anything still wrong is patched with the question's own sentences. The layout is never thrown away.
   if (problems.length) {
-    structured = QRFormatter.repairSimple(text, choices, structured, mathText);
+    structured = QRFormatter.repairSimple(text, choices, structured, mathText, { reading });
   }
 
   const now = Date.now();
@@ -86,7 +90,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly }) {
   return { structured, notes, remaining: check(structured), cached: false };
 }
 
-async function callModel(apiKey, model, messages) {
+async function callModel(apiKey, model, messages, system) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: {
@@ -99,7 +103,7 @@ async function callModel(apiKey, model, messages) {
       model,
       max_tokens: 2000,
       temperature: 0,
-      system: SYSTEM_PROMPT,
+      system,
       messages,
     }),
   });
@@ -113,7 +117,7 @@ async function callModel(apiKey, model, messages) {
     heading: String(sec.heading || ""),
     points: (Array.isArray(sec.points) ? sec.points : []).map((p) => (typeof p === "string" ? { text: p, sub: [] } : { text: String(p.text || ""), sub: arr(p.sub) })),
   }));
-  return { raw, structured: { source: "ai", sections, question: arr(parsed.question), choices_intro: String(parsed.choices_intro || ""), choices: arr(parsed.choices) } };
+  return { raw, structured: { source: "ai", summary: String(parsed.summary || ""), sections, question: arr(parsed.question), choices_intro: String(parsed.choices_intro || ""), choices: arr(parsed.choices) } };
 }
 
 // ---------- housekeeping ----------

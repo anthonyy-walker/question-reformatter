@@ -1,6 +1,9 @@
-// content.js — runs on gradescope.com pages.
-// Toolbar → find questions (or pick one) → show a broken-down version right
-// ABOVE the original. The original stays untouched; you still answer there.
+// content.js — runs on every page.
+// • Gradescope (question mode): toolbar → find questions (or pick one) → a simpler
+//   version appears right ABOVE the original. You still answer on the original.
+// • Every other site (reading mode): long, dense paragraphs get a small ✓ Simplify
+//   button. Click it and the paragraph is swapped for a plain-language version.
+//   Selecting any text also offers ✓ Simplify. "Show original wording" brings it back.
 
 (function () {
   "use strict";
@@ -14,23 +17,33 @@
   const BLOCK = /^(P|DIV|LI|UL|OL|H[1-6]|TR|TABLE|SECTION|LABEL|BLOCKQUOTE|PRE|FIELDSET|LEGEND)$/;
 
   let settings = { ...globalThis.QRUI.DEFAULTS };
-  let picking = false, collapsed = false, working = 0, hovered = null;
+  const QUESTION_SITE = /(^|\.)gradescope\.com$/.test(location.hostname);
+  const HOST = location.hostname;
+  let picking = false, collapsed = !QUESTION_SITE, working = 0, hovered = null, siteOff = false;
   const panels = new Map(); // question element -> panel controller
   let toolbarHost, bannerEl, toastEl, toastTimer;
 
   // ---------------------------------------------------------------- startup
 
+  if (window.top !== window && !QUESTION_SITE) return; // reading mode: skip ads/embeds in frames
+
   loadSettings().then((s) => {
     settings = s;
+    siteOff = (s.offSites || []).includes(HOST);
     renderToolbar();
-    // Bring back panels from last visit (math may render late, so try twice).
-    setTimeout(restorePanels, 900);
-    setTimeout(restorePanels, 2600);
+    if (QUESTION_SITE) {
+      // Bring back panels from last visit (math may render late, so try twice).
+      setTimeout(restorePanels, 900);
+      setTimeout(restorePanels, 2600);
+    } else {
+      startSuggestions();
+    }
   });
 
   chrome.storage.onChanged.addListener((changes) => {
     let touched = false;
-    ["mode", "textSize", "theme", "apiKey", "model"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
+    ["textSize", "theme", "apiKey", "model", "suggest", "offSites"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
+    if (changes.offSites || changes.suggest) { siteOff = (settings.offSites || []).includes(HOST); refreshSuggestions(); }
     if (touched) { applyLook(); renderToolbar(); }
   });
 
@@ -59,19 +72,33 @@
         h("span", { "aria-hidden": "true", style: { fontSize: "18px", lineHeight: 1 } }, "‹"), h("span.qr-tab-word", {}, "Reformatter")));
       return;
     }
-    const isAI = settings.mode === "ai";
     const busy = working > 0;
-    toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Question Reformatter" },
-      h("div.qr-tb-head", {},
-        h("span.qr-tb-title", {}, "Reformatter"),
-        h("button.qr-btn", { "aria-label": "Settings", onclick: openSettings }, gearIcon()),
-        h("button.qr-btn", { "aria-label": "Collapse toolbar", onclick: () => { collapsed = true; renderToolbar(); } }, "›")),
-      h(`button.qr-btn${busy ? ".qr-working" : ".qr-btn-primary"}`, { disabled: busy, onclick: reformatAll }, busy ? "Working…" : "Reformat questions"),
-      h(`button.qr-btn${picking ? ".qr-pick-on" : ""}`, { disabled: busy, "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick a question"),
-      h("div.qr-seg", { role: "radiogroup", "aria-label": "Mode" },
-        h(`button.qr-btn${!isAI ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(!isAI), onclick: () => setMode("rules") }, isAI ? "Rules" : "✓ Rules"),
-        h(`button.qr-btn${isAI ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(isAI), onclick: () => setMode("ai") }, isAI ? "✓ AI" : "AI")),
-      busy && h("p.qr-tb-status", { role: "status" }, "Finding questions on this page…")));
+    const head = h("div.qr-tb-head", {},
+      h("span.qr-tb-title", {}, "Reformatter"),
+      h("button.qr-btn", { "aria-label": "Settings", onclick: openSettings }, gearIcon()),
+      h("button.qr-btn", { "aria-label": "Collapse toolbar", onclick: () => { collapsed = true; renderToolbar(); } }, "›"));
+
+    if (QUESTION_SITE) {
+      toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Question Reformatter" }, head,
+        h(`button.qr-btn${busy ? ".qr-working" : ".qr-btn-primary"}`, { disabled: busy, onclick: reformatAll }, busy ? "Working…" : "Reformat questions"),
+        h(`button.qr-btn${picking ? ".qr-pick-on" : ""}`, { disabled: busy, "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick a question"),
+        busy && h("p.qr-tb-status", { role: "status" }, "Working on it…")));
+      return;
+    }
+    toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Reformatter" }, head,
+      h(`button.qr-btn${picking ? ".qr-pick-on" : ".qr-btn-primary"}`, { "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick text to simplify"),
+      h("button.qr-btn", { "aria-pressed": String(!siteOff), onclick: toggleSite }, siteOff ? "Turn on for this site" : "Turn off for this site"),
+      h("p.qr-tb-status", {}, siteOff ? "Off on " + HOST : `${suggestCount} paragraph${suggestCount === 1 ? "" : "s"} suggested here`)));
+  }
+
+  function toggleSite() {
+    const list = new Set(settings.offSites || []);
+    if (list.has(HOST)) list.delete(HOST); else list.add(HOST);
+    settings.offSites = [...list];
+    siteOff = list.has(HOST);
+    chrome.storage.local.set({ offSites: settings.offSites });
+    refreshSuggestions();
+    renderToolbar();
   }
 
   function gearIcon() {
@@ -87,7 +114,6 @@
     return svg;
   }
 
-  function setMode(m) { settings.mode = m; chrome.storage.local.set({ mode: m }); renderToolbar(); }
 
   // ---------------------------------------------------------------- settings pop-up
 
@@ -122,7 +148,7 @@
     document.body.classList.toggle("qr-picking", picking);
     if (picking) {
       bannerEl = rootAttrs(h("div.qr-banner", { role: "status" },
-        h("span", {}, "Click the question you want reformatted. Press Esc to cancel."),
+        h("span", {}, QUESTION_SITE ? "Click the question you want reformatted. Press Esc to cancel." : "Click the text you want simplified. Press Esc to cancel."),
         h("button.qr-btn", { onclick: togglePicking }, "Cancel")), true);
       document.body.appendChild(bannerEl);
     } else {
@@ -145,7 +171,8 @@
     e.preventDefault(); e.stopPropagation();
     const target = hovered || e.target;
     togglePicking();
-    processElement(growToQuestion(target), { mode: settings.mode });
+    if (QUESTION_SITE) processElement(growToQuestion(target), {});
+    else processReading(target.closest("p,li,dd,blockquote,td,figcaption,div,section,article") || target);
   }, true);
 
   document.addEventListener("keydown", (e) => { if (e.key === "Escape" && picking) togglePicking(); });
@@ -368,7 +395,7 @@
         if (panels.has(el)) return;
         const read = readQuestion(el);
         const entry = saved.find((e) => e.sig === signature(read));
-        if (entry) processElement(el, { mode: entry.mode, restoring: true, read });
+        if (entry) processElement(el, { restoring: true, read });
       });
     });
   }
@@ -378,10 +405,10 @@
   function reformatAll() {
     const qs = findQuestionElements();
     if (!qs.length) { toast("Couldn't find questions automatically. Use Pick a question."); return; }
-    qs.forEach((q) => processElement(q, { mode: settings.mode }));
+    qs.forEach((q) => processElement(q, {}));
   }
 
-  function processElement(q, { mode, restoring, read }) {
+  function processElement(q, { restoring, read }) {
     read = read || readQuestion(q);
     if (F.plain(read.text).replace(/\s+/g, "").length < 5 && !read.choices.length) {
       toast("That part of the page doesn't have enough text. Try clicking the question paragraph itself.");
@@ -391,46 +418,182 @@
     const old = panels.get(q);
     if (old) old.remove();
 
-    const ctrl = makePanel(q, read, () => { panels.delete(q); forget(sig); });
+    const ctrl = makePanel(q, read, () => { panels.delete(q); forget(sig); }, {});
     panels.set(q, ctrl);
+    runAI(ctrl, read, { kind: "question", restoring, onDone: () => remember(sig, q), onMiss: () => { ctrl.remove(); panels.delete(q); } });
+  }
 
-    const rules = F.rulesToSimple(F.ruleFormat(read.text, read.choices));
-    const showRules = (extra) => { ctrl.show(rules, { label: "Rules · original words", ...extra }); remember(sig, q, "rules"); };
-    if (mode !== "ai") { showRules(); return; }
-
+  // Sends text to the AI (or the saved copy) and fills the panel.
+  function runAI(ctrl, read, { kind, restoring, onDone, onMiss }) {
     ctrl.loading();
     working++; renderToolbar();
     chrome.runtime.sendMessage({
-      type: "QR_AI_REFORMAT", text: read.text, choices: read.choices,
+      type: "QR_AI_REFORMAT", kind, text: read.text, choices: read.choices,
       math: read.math.map(({ token, text }) => ({ token, text })),
       cacheOnly: !!restoring, // coming back to a page never spends tokens on its own
     }, (resp) => {
       working--; renderToolbar();
-      if (!resp || !resp.ok) {
-        showRules({ warnTitle: "Showing the Rules version instead", warnText: "The AI didn't respond:", warnings: [resp ? resp.error : "No response from the extension."] });
+      if (chrome.runtime.lastError || !resp || !resp.ok) {
+        const msg = resp && resp.error ? resp.error : "The extension didn't respond. Reload the page and try again.";
+        ctrl.error(msg, () => runAI(ctrl, read, { kind, restoring: false, onDone, onMiss }));
         return;
       }
-      const { structured, notes, cached, miss } = resp.result;
-      if (miss) { showRules(); return; }
-      ctrl.show(structured.sections ? structured : F.rulesToSimple(structured), {});
-      remember(sig, q, "ai");
+      if (resp.result.miss) { onMiss && onMiss(); return; }
+      ctrl.show(resp.result.structured, {});
+      onDone && onDone();
     });
+  }
+
+  // ---------------------------------------------------------------- reading mode (any website)
+
+  const SKIP_AREAS = "nav,header,footer,aside,form,button,select,textarea,input,pre,code,kbd,[contenteditable],[role=navigation],[role=banner],[role=contentinfo],[role=menu],[role=dialog],[aria-hidden=true],[data-qr]";
+  const MAX_SUGGEST = 40;
+  let suggestCount = 0, scanTimer = null;
+  const readingPanels = new Map(); // element -> panel
+
+  function startSuggestions() {
+    refreshSuggestions();
+    new MutationObserver((muts) => {
+      if (muts.every((m) => m.target.closest && m.target.closest("[data-qr]"))) return;
+      clearTimeout(scanTimer);
+      scanTimer = setTimeout(refreshSuggestions, 1200);
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+
+  function refreshSuggestions() {
+    if (QUESTION_SITE) return;
+    const on = settings.suggest !== false && !siteOff;
+    if (!on) {
+      document.querySelectorAll(".qr-suggest").forEach((b) => b.remove());
+      document.querySelectorAll("[data-qr-suggested]").forEach((e) => e.removeAttribute("data-qr-suggested"));
+      suggestCount = 0;
+      renderToolbar();
+      return;
+    }
+    let added = 0;
+    suggestCount = document.querySelectorAll(".qr-suggest:not(.qr-sel-btn)").length;
+    for (const el of findDenseParagraphs()) {
+      if (suggestCount >= MAX_SUGGEST) break;
+      if (el.hasAttribute("data-qr-suggested") || readingPanels.has(el)) continue;
+      el.setAttribute("data-qr-suggested", "1");
+      const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Simplify this paragraph",
+        onclick: (e) => { e.preventDefault(); e.stopPropagation(); processReading(el); },
+        onmouseenter: () => el.classList.add("qr-suggest-target"),
+        onmouseleave: () => el.classList.remove("qr-suggest-target") },
+        h("span", { "aria-hidden": "true" }, "✓"), "Simplify"), false);
+      el.appendChild(btn);
+      suggestCount++; added++;
+    }
+    if (!collapsed) renderToolbar();
+  }
+
+  // A paragraph is suggested when it's long, or medium-length with long sentences or many long words.
+  function findDenseParagraphs() {
+    const out = [];
+    const cands = document.querySelectorAll("p, li, dd, blockquote, td, figcaption, div, section, article");
+    for (const el of cands) {
+      if (el.closest(SKIP_AREAS)) continue;
+      if (el.tagName === "DIV" || el.tagName === "SECTION" || el.tagName === "ARTICLE") {
+        // only text containers: own text, no block children holding the text
+        const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join(" ").trim();
+        if (own.split(/\s+/).length < 30) continue;
+        if (el.querySelector("p,li,div,section,article,table")) continue;
+      }
+      if (el.tagName === "LI" && el.querySelector("p,ul,ol")) continue;
+      if (el.tagName === "TD" && el.querySelector("p,div,table")) continue;
+      const stats = textStats(el);
+      if (!stats) continue;
+      const { words, avgSentence, longShare } = stats;
+      const dense = words >= 70 || (words >= 40 && (avgSentence >= 22 || longShare >= 0.3));
+      if (!dense) continue;
+      const r = el.getBoundingClientRect();
+      if (r.width < 200 || r.height < 30) continue;
+      const cs = getComputedStyle(el);
+      if (cs.display === "none" || cs.visibility === "hidden") continue;
+      out.push(el);
+    }
+    // keep the innermost text blocks only
+    return out.filter((n) => !out.some((m) => m !== n && n.contains(m)));
+  }
+
+  function textStats(el) {
+    const t = (el.innerText || "").replace(/✓\s*Simplify/g, "").replace(/\s+/g, " ").trim();
+    if (t.length < 200) return null;
+    const words = t.split(" ");
+    const sentences = Math.max(1, (t.match(/[.!?](\s|$)/g) || []).length);
+    const longShare = words.filter((w) => w.replace(/[^A-Za-z]/g, "").length >= 9).length / words.length;
+    return { words: words.length, avgSentence: words.length / sentences, longShare };
+  }
+
+  function processReading(el) {
+    if (readingPanels.has(el)) return;
+    const math = newMathRegistry();
+    let text = extractRich(el, { skip: new Set(), math });
+    if (F.plain(text).replace(/\s+/g, " ").trim().split(" ").length < 8) { toast("That's too short to simplify. Pick a longer paragraph."); return; }
+    if (text.length > 8000) text = text.slice(0, 8000);
+    const read = { text, choices: [], choiceInfo: [], math: math.list, title: "this paragraph" };
+    const btn = el.querySelector(":scope > .qr-suggest"); if (btn) { btn.remove(); suggestCount = Math.max(0, suggestCount - 1); }
+    const ctrl = makePanel(el, read, () => {
+      readingPanels.delete(el);
+      el.removeAttribute("data-qr-suggested"); // offer it again later
+      clearTimeout(scanTimer); scanTimer = setTimeout(refreshSuggestions, 300);
+    }, { reading: true, hideTarget: el });
+    readingPanels.set(el, ctrl);
+    runAI(ctrl, read, { kind: "reading" });
+  }
+
+  // Selecting text anywhere offers ✓ Simplify for just that selection.
+  let selBtn = null;
+  function hideSelBtn() { if (selBtn) { selBtn.remove(); selBtn = null; } }
+  document.addEventListener("mousedown", (e) => { if (selBtn && !selBtn.contains(e.target)) hideSelBtn(); }, true);
+  document.addEventListener("scroll", hideSelBtn, true);
+  document.addEventListener("mouseup", (e) => {
+    if (QUESTION_SITE || siteOff || picking || e.target.closest("[data-qr]")) return;
+    setTimeout(() => {
+      const sel = window.getSelection();
+      const text = sel ? sel.toString().replace(/\s+/g, " ").trim() : "";
+      if (!sel || sel.isCollapsed || text.split(" ").length < 12) return;
+      const range = sel.getRangeAt(0);
+      const anchorEl = (range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement);
+      if (!anchorEl || anchorEl.closest("input,textarea,[contenteditable],[data-qr]")) return;
+      const rect = range.getBoundingClientRect();
+      hideSelBtn();
+      selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Simplify the selected text",
+        style: { top: Math.max(8, rect.bottom + 8) + "px", left: Math.max(8, Math.min(window.innerWidth - 140, rect.left)) + "px" },
+        onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); hideSelBtn(); processSelection(range, text); } },
+        h("span", { "aria-hidden": "true" }, "✓"), "Simplify"), false);
+      document.body.appendChild(selBtn);
+    }, 10);
+  }, true);
+
+  function processSelection(range, text) {
+    let end = range.endContainer.nodeType === 1 ? range.endContainer : range.endContainer.parentElement;
+    end = end.closest("p,li,dd,blockquote,td,figcaption,div,section,article,h1,h2,h3,h4,h5,h6") || end;
+    if (text.length > 8000) text = text.slice(0, 8000);
+    const read = { text, choices: [], choiceInfo: [], math: [], title: "the selected text" };
+    const ctrl = makePanel(end, read, () => {}, { reading: true, after: true });
+    window.getSelection().removeAllRanges();
+    runAI(ctrl, read, { kind: "reading" });
   }
 
   // ---------------------------------------------------------------- the panel
 
-  function makePanel(q, read, onClosed) {
+  // opts.reading: plain text (no choices). opts.hideTarget: hide that element while the rewrite shows.
+  // opts.after: insert the panel after q instead of before it.
+  function makePanel(q, read, onClosed, opts = {}) {
     const mathByToken = Object.fromEntries(read.math.map((m) => [m.token, m]));
-    const panel = rootAttrs(h("div.qr-panel", { role: "region", "aria-label": "Reformatted view of " + read.title }), false);
-    q.parentNode.insertBefore(panel, q);
+    const panel = rootAttrs(h(`div.qr-panel${opts.reading ? ".qr-reading" : ""}`, { role: "region", "aria-label": "Simpler version of " + read.title }), false);
+    q.parentNode.insertBefore(panel, opts.after ? q.nextSibling : q);
 
     let data = null, meta = {}, pending = null, part = 0, showOriginal = false;
 
     const inputListener = () => data && draw();
     read.choiceInfo.forEach((c) => c.input.addEventListener("change", inputListener));
 
+    function setOriginalHidden(hide) { if (opts.hideTarget) opts.hideTarget.style.display = hide ? "none" : ""; }
     function remove() {
       read.choiceInfo.forEach((c) => c.input.removeEventListener("change", inputListener));
+      setOriginalHidden(false);
       panel.remove();
     }
     function close() { remove(); onClosed(); }
@@ -438,13 +601,23 @@
     function header() {
       return h("div.qr-header", {},
         h("div.qr-header-actions", {},
-          data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
+          data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; setOriginalHidden(!showOriginal); draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
           h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, "✕")));
     }
 
     function loading() {
       panel.textContent = "";
-      panel.append(header(), h("p.qr-loading", { role: "status" }, "Reformatting…"));
+      panel.append(header(), h("p.qr-loading", { role: "status" }, opts.reading ? "Simplifying…" : "Reformatting…"));
+    }
+
+    function error(msg, retry) {
+      panel.textContent = "";
+      panel.append(header(), h("div.qr-warn", { role: "status" },
+        h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
+        h("div", { style: { display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 } },
+          h("p.qr-warn-title", {}, "Couldn't reach the AI"),
+          h("p.qr-warn-text", {}, msg),
+          h("div", {}, h("button.qr-btn", { onclick: retry }, "Try again")))));
     }
 
     // Renders rich text: math tokens, <b>/<i>, and bold numbers / meaning-flipping words.
@@ -593,18 +766,21 @@
             h("p.qr-warn-text", {}, meta.warnText),
             h("ul.qr-warn-list", {}, meta.warnings.map((w) => h("li", {}, w))))));
       }
-      if (showOriginal) panel.append(originalSection());
+      if (showOriginal && !opts.hideTarget) panel.append(originalSection());
+      if (data.summary) panel.append(h("div.qr-keypoint", {}, h("span.qr-keypoint-label", {}, "Key point"), h("p.qr-text", {}, rich(data.summary))));
       const qbox = h("div.qr-box", {});
       (data.sections || []).forEach((sec) => { if (sec.points && sec.points.length) qbox.append(section(sec.heading || "Details", sec.points)); });
       if ((data.question || []).length) qbox.append(questionSection());
       const sym = symbolsSection(); if (sym) qbox.append(sym);
-      panel.append(qbox, choicesSection());
+      panel.append(qbox);
+      if (!opts.reading) panel.append(choicesSection());
       if (focusedLabel) { const b = [...panel.querySelectorAll("button")].find((x) => x.textContent === focusedLabel); if (b) b.focus(); }
     }
 
     return {
       remove, loading,
-      show(d, m) { data = d; meta = m || {}; draw(); },
+      error,
+      show(d, m) { data = d; meta = m || {}; setOriginalHidden(!showOriginal); draw(); },
     };
   }
 })();

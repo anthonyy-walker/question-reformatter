@@ -278,6 +278,7 @@
 
   function simpleLines(s) {
     const out = [];
+    if (s.summary) out.push(s.summary);
     (s.sections || []).forEach((sec) => {
       if (sec.heading) out.push(sec.heading);
       (sec.points || []).forEach((p) => { out.push(p.text || ""); (p.sub || []).forEach((x) => out.push(x)); });
@@ -286,7 +287,8 @@
     return out;
   }
 
-  function checkSimple(originalText, originalChoices, s, mathText) {
+  // opts.reading: general text (no question / choices required).
+  function checkSimple(originalText, originalChoices, s, mathText, opts = {}) {
     const problems = [];
     const choices = originalChoices || [];
     const origAll = originalText + " \n " + choices.join(" \n ");
@@ -308,7 +310,8 @@
     const negs = diff(strictNeg(origAll), strictNeg(outAll));
     if (negs.missing.length) problems.push(`Dropped words that change the meaning: ${negs.missing.join(", ")}`);
 
-    if (!(s.question || []).filter((q) => plain(q).trim()).length) problems.push("Left out the question itself.");
+    if (!opts.reading && !(s.question || []).filter((q) => plain(q).trim()).length) problems.push("Left out the question itself.");
+    if (opts.reading && !simpleLines(s).filter((x) => plain(x).trim()).length) problems.push("Returned nothing.");
 
     if (choices.length) {
       if ((s.choices || []).length !== choices.length) problems.push(`Gave ${(s.choices || []).length} answer choices instead of ${choices.length}.`);
@@ -325,10 +328,11 @@
   }
 
   // Keeps the AI's rewrite and patches only what broke a rule, using the question's own words.
-  function repairSimple(originalText, originalChoices, s, mathText) {
+  function repairSimple(originalText, originalChoices, s, mathText, opts = {}) {
     const choices = originalChoices || [];
     const out = {
       source: "ai",
+      summary: s.summary || "",
       sections: (s.sections || []).map((sec) => ({ heading: sec.heading || "", points: (sec.points || []).map((p) => ({ text: p.text || "", sub: [...(p.sub || [])] })) })),
       question: [...(s.question || [])],
       choices_intro: s.choices_intro || "",
@@ -355,11 +359,12 @@
     });
     out.sections = out.sections.filter((sec) => sec.points.length);
     out.question = out.question.filter((q) => clean(q) && plain(q).trim());
+    if (out.summary && !clean(out.summary)) out.summary = "";
 
     // 3. If the question itself is missing, use the original question sentence(s).
     const multi = splitParts(normalizeSpace(originalText).replace(/\n/g, " \n"));
     const sentences = multi ? [...splitSentences(multi.before), ...multi.parts] : splitSentences(originalText);
-    if (!out.question.length) {
+    if (!opts.reading && !out.question.length) {
       const t = multi ? multi.parts : sentences.filter(isTaskSentence);
       out.question = t.length ? t : sentences.slice(-1);
     }
@@ -367,7 +372,7 @@
     // 4. Anything still left out: add the original sentence under "Also in the question".
     const extra = [];
     for (let round = 0; round < 60; round++) {
-      const problems = checkSimple(originalText, choices, { ...out, sections: [...out.sections, { heading: "", points: extra.map((t) => ({ text: t, sub: [] })) }] }, mathText);
+      const problems = checkSimple(originalText, choices, { ...out, sections: [...out.sections, { heading: "", points: extra.map((t) => ({ text: t, sub: [] })) }] }, mathText, opts);
       if (!problems.length) break;
       const outAll = [...simpleLines(out), ...extra, out.choices_intro, ...out.choices].join(" \n ");
       const lostNum = diff(extractNumbers(origAll), outNumbers(outAll)).missing[0];
@@ -379,7 +384,7 @@
       if (!src) break;
       extra.push(src);
     }
-    if (extra.length) out.sections.push({ heading: "Also in the question", points: extra.map((t) => ({ text: t, sub: [] })) });
+    if (extra.length) out.sections.push({ heading: opts.reading ? "Also in the original" : "Also in the question", points: extra.map((t) => ({ text: t, sub: [] })) });
     return out;
   }
 

@@ -22,7 +22,7 @@
     return el;
   }
 
-  const DEFAULTS = { mode: "rules", textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001" };
+  const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [] };
   const FIELDS = Object.keys(DEFAULTS);
 
   function load() {
@@ -43,17 +43,21 @@
         h("h1", { text: "Settings" }),
         opts.onClose && h("button.qr-btn.qr-btn-icon", { "aria-label": "Close settings", onclick: opts.onClose }, "✕"));
 
-      const modes = h("div.qr-fieldset", { role: "radiogroup", "aria-label": "Default mode" },
-        h("div.qr-legend", { text: "Default mode" }),
-        h("div.qr-mode-grid", {}, [
-          ["rules", "Rules", "Keeps the original words. Splits the question by sentence. No AI, nothing leaves your browser."],
-          ["ai", "AI", "Rewrites the question in plain, simple language, in short points under clear headings. It never answers or hints. Anything it gets wrong is fixed automatically. Results are saved, so each question is only paid for once."],
-        ].map(([k, name, desc]) => {
-          const on = draft.mode === k;
-          return h(`button.qr-btn.qr-mode${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.mode = k; render(); } },
-            h("span.qr-mode-name", {}, h("span.qr-dot", { "aria-hidden": "true" }, on ? "✓" : ""), name),
-            h("span.qr-mode-desc", { text: desc }));
-        })));
+      // Suggestions on websites + sites where it's turned off
+      const suggestOn = draft.suggest !== false;
+      const offList = (draft.offSites || []);
+      const suggest = h("div.qr-fieldset", {},
+        h("div.qr-legend", { text: "Suggestions on websites" }),
+        h("div.qr-seg", { role: "radiogroup", "aria-label": "Suggestions on websites" },
+          [[true, "On"], [false, "Off"]].map(([v, name]) => {
+            const on = suggestOn === v;
+            return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.suggest = v; render(); } }, (on ? "✓ " : "") + name);
+          })),
+        h("span.qr-help", { text: "When on, long or dense paragraphs get a small ✓ Simplify button. Nothing is sent to the AI until you click it." }),
+        offList.length
+          ? h("div.qr-saved-row", {}, h("span", {}, "Turned off on: "), offList.map((host) =>
+              h("button.qr-btn", { "aria-label": "Turn back on for " + host, onclick: () => { draft.offSites = offList.filter((x) => x !== host); render(); } }, host + "  ✕")))
+          : null);
 
       const seg = (label, key, options) => h("div.qr-fieldset", {},
         h("div.qr-legend", { text: label }),
@@ -73,8 +77,8 @@
         }));
 
       const fields = h("div.qr-two", {},
-        h("label.qr-field", {}, h("span.qr-legend", { text: "API key" }), key, h("span.qr-help", { text: "Only needed for AI mode. Stored on this device only. Sent only to api.anthropic.com." })),
-        h("label.qr-field", {}, h("span.qr-legend", { text: "Model" }), model, h("span.qr-help", { text: "Used only when the mode is AI." })));
+        h("label.qr-field", {}, h("span.qr-legend", { text: "API key" }), key, h("span.qr-help", { text: "Required. Stored on this device only. Sent only to api.anthropic.com." })),
+        h("label.qr-field", {}, h("span.qr-legend", { text: "Model" }), model, h("span.qr-help", { text: "Haiku is plenty for most text." })));
 
       // Saved AI results
       const savedCount = h("span", { text: "…" });
@@ -83,7 +87,7 @@
       const saved = h("div.qr-fieldset", {},
         h("div.qr-legend", { text: "Saved AI results" }),
         h("div.qr-saved-row", {}, h("span", {}, "Saved on this device: ", savedCount), clearBtn),
-        h("span.qr-help", { text: "Coming back to an assignment re-uses these, so it costs nothing. They are re-made automatically if the AI instructions or model change." }));
+        h("span.qr-help", { text: "Simplifying the same text again (same page, another day) re-uses these, so it costs nothing. They are re-made automatically if the AI instructions or model change." }));
 
       // Exact instructions disclosure
       const instr = h("div.qr-instr-wrap", {});
@@ -91,17 +95,20 @@
       instr.append(h("button.qr-btn.qr-disclosure", { "aria-expanded": String(open), onclick: () => { render.showInstr = !open; render(); } },
         h("span", { "aria-hidden": "true", style: { width: "1em" } }, open ? "▾" : "▸"), "Show the exact instructions the AI gets"));
       if (open) {
-        const copyBtn = h("button.qr-btn", { onclick: () => { navigator.clipboard.writeText(SYSTEM_PROMPT).then(() => { copyBtn.textContent = "✓ Copied"; }); } }, "Copy instructions");
+        const copyBtn = h("button.qr-btn", { onclick: () => { navigator.clipboard.writeText("QUESTIONS (Gradescope)\n\n" + SYSTEM_PROMPT + "\n\n\nEVERYTHING ELSE (websites)\n\n" + READING_PROMPT).then(() => { copyBtn.textContent = "✓ Copied"; }); } }, "Copy instructions");
         instr.append(h("div.qr-instr", {},
-          h("div.qr-instr-head", { text: "Sent with every question, word for word" }),
+          h("div.qr-instr-head", { text: "Sent with every request, word for word" }),
+          h("div.qr-instr-head", { text: "For questions (Gradescope)" }),
           h("pre.qr-pre", { text: SYSTEM_PROMPT }),
+          h("div.qr-instr-head", { text: "For everything else (websites)" }),
+          h("pre.qr-pre", { text: READING_PROMPT }),
           h("div.qr-instr-head", { text: "Checked by the extension before anything is shown" }),
           h("ul.qr-ul", {},
-            h("li", { text: "Every number from the question is still there, and none are invented." }),
+            h("li", { text: "Every number from the original is still there, and none are invented." }),
             h("li", { text: "Every math expression is still there, unchanged, and none are invented." }),
-            h("li", { text: "The question itself is still there." }),
+            h("li", { text: "Questions: the question itself is still there." }),
             h("li", { text: "Every negation word from the original is still there." }),
-            h("li", { text: "Each answer choice keeps its numbers, math and meaning-changing words, in the same order. If one doesn't, the original wording is used for it." })),
+            h("li", { text: "Questions: each answer choice keeps its numbers, math and meaning-changing words, in the same order. If one doesn't, the original wording is used for it." })),
           h("p.qr-help", { text: "If a check fails, the AI's rewrite is never thrown away. The AI is asked once to fix its own mistake. Anything still wrong is fixed automatically: lines with invented numbers are removed, and anything left out is added back in the question's own words." }),
           h("div", {}, copyBtn)));
       }
@@ -111,7 +118,7 @@
         chrome.storage.local.set(draft, () => { status.textContent = "✓ Saved"; opts.onSaved && opts.onSaved({ ...draft }); });
       } }, "Save");
 
-      card.append(head, modes,
+      card.append(head, suggest,
         seg("Text size", "textSize", [["normal", "Normal", 16], ["larger", "Larger", 20], ["largest", "Largest", 24]]),
         seg("Theme", "theme", [["light", "Light"], ["dark", "Dark"]]),
         fields, saved, instr,
