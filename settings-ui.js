@@ -22,6 +22,34 @@
     return el;
   }
 
+
+  // One small icon set (no emoji anywhere). Stroke icons inherit the text color.
+  const ICONS = {
+    check: "M5 12.5l4.5 4.5L19 7.5",
+    close: "M6.5 6.5l11 11M17.5 6.5l-11 11",
+    left: "M14.5 6l-6 6 6 6",
+    right: "M9.5 6l6 6-6 6",
+    down: "M6 9.5l6 6 6-6",
+    info: "M12 11v5.5M12 7.6v.1",
+    gear: "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z",
+  };
+  function icon(name, size = 18) {
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    [["width", size], ["height", size], ["viewBox", "0 0 24 24"], ["fill", "none"], ["stroke", "currentColor"],
+      ["stroke-width", name === "gear" ? 1.8 : 2.2], ["stroke-linecap", "round"], ["stroke-linejoin", "round"], ["aria-hidden", "true"], ["class", "qr-icon qr-icon-" + name]]
+      .forEach(([k, v]) => svg.setAttribute(k, v));
+    if (name === "gear" || name === "info") {
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", "12"); c.setAttribute("cy", "12"); c.setAttribute("r", name === "gear" ? "3" : "9.5");
+      svg.append(c);
+    }
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", ICONS[name]);
+    svg.append(p);
+    return svg;
+  }
+
   const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [], provider: "local", prefetch: true };
   const FIELDS = Object.keys(DEFAULTS);
 
@@ -41,7 +69,7 @@
 
       const head = h("div.qr-set-head", {},
         h("h1", { text: "Settings" }),
-        opts.onClose && h("button.qr-btn.qr-btn-icon", { "aria-label": "Close settings", onclick: opts.onClose }, "✕"));
+        opts.onClose && h("button.qr-btn.qr-btn-icon", { "aria-label": "Close settings", onclick: opts.onClose }, icon("close")));
 
       // Which AI does the rewriting
       const providerOn = draft.provider || "local";
@@ -55,14 +83,14 @@
         ].map(([k, name, desc]) => {
           const on = providerOn === k;
           return h(`button.qr-btn.qr-mode${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.provider = k; render(); } },
-            h("span.qr-mode-name", {}, h("span.qr-dot", { "aria-hidden": "true" }, on ? "✓" : ""), name),
+            h("span.qr-mode-name", {}, h("span.qr-dot", { "aria-hidden": "true" }, on ? icon("check", 14) : null), name),
             h("span.qr-mode-desc", { text: desc }));
         })),
         localStatus, setupRow);
       chrome.runtime.sendMessage({ type: "QR_LOCAL_STATUS" }, (r) => {
         const st = r && r.ok ? r.result : "unavailable";
         localStatus.textContent = {
-          available: "✓ On-device model is ready on this computer.",
+          available: "On-device model is ready on this computer.",
           downloadable: "On-device model isn't downloaded yet (one time, a few GB).",
           downloading: "On-device model is downloading…",
           unavailable: "This computer can't run the on-device model. Claude will be used.",
@@ -74,7 +102,7 @@
             if (!canHere) { chrome.runtime.sendMessage({ type: "QR_OPEN_OPTIONS" }); return; }
             btn.disabled = true; btn.textContent = "Downloading… 0%";
             QRLocal.download((p) => { btn.textContent = `Downloading… ${Math.round(p * 100)}%`; })
-              .then(() => { localStatus.textContent = "✓ On-device model is ready on this computer."; btn.remove(); })
+              .then(() => { localStatus.textContent = "On-device model is ready on this computer."; btn.remove(); })
               .catch((e) => { btn.disabled = false; btn.textContent = "Try again"; localStatus.textContent = "Download failed: " + e.message; });
           } }, canHere ? "Set up the on-device model" : "Open setup page");
           setupRow.append(btn);
@@ -89,19 +117,19 @@
         h("div.qr-seg", { role: "radiogroup", "aria-label": "Suggestions on websites" },
           [[true, "On"], [false, "Off"]].map(([v, name]) => {
             const on = suggestOn === v;
-            return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.suggest = v; render(); } }, (on ? "✓ " : "") + name);
+            return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.suggest = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "When on, long or dense paragraphs get a small ✓ Simplify button." }),
+        h("span.qr-help", { text: "When on, long or dense paragraphs get a small Simplify button." }),
         h("div.qr-legend", { text: "Get rewrites ready ahead of time", style: { marginTop: "10px" } }),
         h("div.qr-seg", { role: "radiogroup", "aria-label": "Get rewrites ready ahead of time" },
           [[true, "On"], [false, "Off"]].map(([v, name]) => {
             const on = (draft.prefetch !== false) === v;
-            return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.prefetch = v; render(); } }, (on ? "✓ " : "") + name);
+            return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.prefetch = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "Free model only. Suggested paragraphs are simplified in the background, closest to where you're reading first, so ✓ Simplify opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
+        h("span.qr-help", { text: "Free model only. Suggested paragraphs are simplified in the background, closest to where you're reading first, so Simplify opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
         offList.length
           ? h("div.qr-saved-row", {}, h("span", {}, "Turned off on: "), offList.map((host) =>
-              h("button.qr-btn", { "aria-label": "Turn back on for " + host, onclick: () => { draft.offSites = offList.filter((x) => x !== host); render(); } }, host + "  ✕")))
+              h("button.qr-btn", { "aria-label": "Turn back on for " + host, onclick: () => { draft.offSites = offList.filter((x) => x !== host); render(); } }, host, icon("close", 14))))
           : null);
 
       const seg = (label, key, options) => h("div.qr-fieldset", {},
@@ -110,7 +138,7 @@
           const on = draft[key] === k;
           return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft[key] = k; render(); } },
             px && h("span", { style: { fontSize: px + "px", fontWeight: 700, lineHeight: 1 } }, "Aa"),
-            h("span", {}, (on ? "✓ " : "") + name));
+            on ? icon("check", 15) : null, h("span", {}, name));
         })));
 
       const key = h("input.qr-input", { type: "password", placeholder: "Paste your key (sk-ant-…)", autocomplete: "off", value: draft.apiKey, oninput: (e) => { draft.apiKey = e.target.value.trim(); } });
@@ -138,9 +166,9 @@
       const instr = h("div.qr-instr-wrap", {});
       const open = !!render.showInstr;
       instr.append(h("button.qr-btn.qr-disclosure", { "aria-expanded": String(open), onclick: () => { render.showInstr = !open; render(); } },
-        h("span", { "aria-hidden": "true", style: { width: "1em" } }, open ? "▾" : "▸"), "Show the exact instructions the AI gets"));
+        icon(open ? "down" : "right", 16), "Show the exact instructions the AI gets"));
       if (open) {
-        const copyBtn = h("button.qr-btn", { onclick: () => { navigator.clipboard.writeText("QUESTIONS (Gradescope)\n\n" + SYSTEM_PROMPT + "\n\n\nEVERYTHING ELSE (websites)\n\n" + READING_PROMPT).then(() => { copyBtn.textContent = "✓ Copied"; }); } }, "Copy instructions");
+        const copyBtn = h("button.qr-btn", { onclick: () => { navigator.clipboard.writeText("QUESTIONS (Gradescope)\n\n" + SYSTEM_PROMPT + "\n\n\nEVERYTHING ELSE (websites)\n\n" + READING_PROMPT).then(() => { copyBtn.textContent = "Copied"; }); } }, "Copy instructions");
         instr.append(h("div.qr-instr", {},
           h("div.qr-instr-head", { text: "Sent with every request, word for word" }),
           h("div.qr-instr-head", { text: "For questions (Gradescope)" }),
@@ -160,7 +188,7 @@
 
       const status = h("span.qr-saved", { role: "status" });
       const save = h("button.qr-btn.qr-btn-primary", { style: { minWidth: "120px" }, onclick: () => {
-        chrome.storage.local.set(draft, () => { status.textContent = "✓ Saved"; opts.onSaved && opts.onSaved({ ...draft }); });
+        chrome.storage.local.set(draft, () => { status.textContent = "Saved"; opts.onSaved && opts.onSaved({ ...draft }); });
       } }, "Save");
 
       card.append(head, provider, suggest,
@@ -174,5 +202,5 @@
     return card;
   }
 
-  root.QRUI = { h, buildSettings, loadSettings: load, DEFAULTS };
+  root.QRUI = { h, icon, buildSettings, loadSettings: load, DEFAULTS };
 })(typeof globalThis !== "undefined" ? globalThis : this);

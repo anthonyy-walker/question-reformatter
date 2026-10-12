@@ -435,8 +435,13 @@
     return [line];
   }
 
+  const noEmoji = (t) => String(t || "").replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}]\uFE0F?|\uFE0F/gu, "").replace(/\s{2,}/g, " ").trim();
+
   function tidyLines(s) {
     if (!s || !Array.isArray(s.sections)) return s;
+    // No emoji anywhere, even if the AI adds some.
+    s = { ...s, summary: noEmoji(s.summary), question: (s.question || []).map(noEmoji), choices_intro: noEmoji(s.choices_intro),
+      sections: s.sections.map((sec) => ({ heading: noEmoji(sec.heading), points: (sec.points || []).map((p) => ({ text: noEmoji(p.text), sub: (p.sub || []).map(noEmoji) })) })) };
     const sections = [];
     s.sections.forEach((sec) => {
       const points = [];

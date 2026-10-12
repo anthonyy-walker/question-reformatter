@@ -2,7 +2,7 @@
 
 A Chrome extension that rewrites dense text in plain, simple language — for students with dyslexia, autism, ADHD, or anyone who loses the point inside a long paragraph.
 
-- **On any website:** long or dense paragraphs get a small **✓ Simplify** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers ✓ Simplify.
+- **On any website:** long or dense paragraphs get a small **Simplify** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers Simplify.
 - **On Gradescope:** questions are rewritten in plain language too, with stricter rules — it never solves, hints, rules out choices, or reorders answers. You still answer on the original question.
 - **Show original wording** brings back the exact original at any time.
 - **Short lines:** every bullet fits on one line (about 10 words), with at most 8 lines per section. Anything longer is split at a natural break into another bullet, and big sections continue under "(cont.)" — nothing is cut off.
@@ -11,29 +11,35 @@ A Chrome extension that rewrites dense text in plain, simple language — for st
 1. Clone or unzip this folder somewhere you'll keep it.
 2. Go to `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** → pick the `question-reformatter` folder.
-4. Open the settings (⚙ on the toolbar, or the extension's icon):
+4. Open the settings (the gear on the toolbar, or the extension's icon):
    - **Free — on this computer** (default): click **Set up the on-device model** once. Chrome downloads its built-in model (Gemini Nano, a few GB). After that every rewrite is free, offline, and private.
    - **Claude** (optional): paste an Anthropic API key for best quality. With the free model selected, Claude is only used as a backup.
 
 ### Updating without losing your key
-Don't remove the extension. Replace the files in the same folder (`git pull`), then click ↻ on the extension in `chrome://extensions`.
+Don't remove the extension. Replace the files in the same folder (`git pull`), then click the reload icon on the extension in `chrome://extensions`.
 
 ## Use
 - **Any website**
-  - ✓ Simplify buttons appear on hard-to-read paragraphs.
+  - Simplify buttons appear on hard-to-read paragraphs.
   - **Ready ahead of time (free model):** suggested paragraphs are simplified in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
   - **How paragraphs are found:** every visible piece of text is grouped by the box it sits in (so text split across links, bold, spans or line breaks still counts), then scored: long, or medium-length and hard to read (reading grade 12+, long sentences, many long words), or short but very hard (grade 16+). Works inside embedded frames and web components too. Menus, footers, forms, buttons and code are skipped.
-  - Select text (12+ words) → ✓ Simplify appears next to it.
+  - Select text (12+ words) → Simplify appears next to it.
   - The small **Reformatter** tab on the right edge opens the toolbar: **Pick text to simplify**, **Turn off for this site**, settings.
 - **Gradescope**
   - **Reformat questions** finds every question; **Pick a question** if auto-find misses one.
   - Click a simplified answer choice → confirm → it selects that answer on the page.
 
+## Look and feel
+- One design system everywhere: Atkinson Hyperlegible, one button style, one icon set, one radius scale.
+- Accent is a metallic dark-green gradient, used only for actions and the key point.
+- Short animations show what changed (panels opening, a sheen while loading, a small pop when a rewrite is ready). They switch off when your system asks for reduced motion.
+- No emoji anywhere — the AI's output is cleaned of emoji too.
+
 ## Which AI does the work
 - **Free, on this computer:** Chrome's built-in model through the Prompt API. Needs macOS 13+ / Windows 10+, 22 GB free disk, and 16 GB RAM or a GPU with 4 GB+. Check `chrome://on-device-internals`.
 - **Automatic backup:** if the built-in model can't run, or its answer still has more than 2 problems after it fixes itself, Claude takes over for that one rewrite — only if a Claude key is set.
 - **Claude:** best quality; about $0.002 per rewrite with Haiku.
-- **✨ Better with Claude:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
+- **Better with Claude:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
 - The free model gets extra style rules and a worked example (2–4 topics, no repeated facts, abbreviations spelled out), because small models copy examples closely.
 
 ## How the AI is kept honest

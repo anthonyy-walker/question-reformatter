@@ -19,7 +19,7 @@ Rewrite the question so it is fast and easy to read:
 - Use sub-points for detail under a point.
 - If the setup describes a process, list it as numbered steps ("Step 1: ...").
 - You may define a word or symbol from the question in plain words, so the sentence can be read. Example: "Planned spending" = the budget they had in mind before shopping.
-- Arrows (→) and "=" are fine for short definitions.
+- Arrows (→) and "=" are fine for short definitions. Never use emoji.
 - If several answer choices are the same sentence except for one or two words, put that shared sentence in "choices_intro" with ___ for the part that changes, and make each choice just the part that changes.
 
 SPECIAL MARKERS
@@ -103,7 +103,7 @@ Rewrite the text so it is fast and easy to read, with the same meaning:
 - The summary is also one line: about 15 words at most.
 - Processes or sequences become numbered steps ("Step 1: ...").
 - You may explain a hard word, term or symbol in plain words, e.g. "Mitigate" = make less bad.
-- Arrows (→) and "=" are fine for short definitions.
+- Arrows (→) and "=" are fine for short definitions. Never use emoji.
 
 KEEP EXACTLY
 - Every number, date, amount and percentage, written the same way.

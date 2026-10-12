@@ -1,15 +1,15 @@
 // content.js — runs on every page.
 // • Gradescope (question mode): toolbar → find questions (or pick one) → a simpler
 //   version appears right ABOVE the original. You still answer on the original.
-// • Every other site (reading mode): long, dense paragraphs get a small ✓ Simplify
+// • Every other site (reading mode): long, dense paragraphs get a small Simplify
 //   button. Click it and the paragraph is swapped for a plain-language version.
-//   Selecting any text also offers ✓ Simplify. "Show original wording" brings it back.
+//   Selecting any text also offers Simplify. "Show original wording" brings it back.
 
 (function () {
   "use strict";
   const F = globalThis.QRFormatter;
   const M = globalThis.QRMath;
-  const { h, buildSettings, loadSettings } = globalThis.QRUI;
+  const { h, icon, buildSettings, loadSettings } = globalThis.QRUI;
 
   const PAGE_KEY = "p:" + location.origin + location.pathname;
   const EXTRA_SELECTORS = ['[class*="questionPrompt"]', '[class*="question--prompt"]', '[class*="problem--prompt"]', '[class*="question--body"]', ".question"];
@@ -72,14 +72,14 @@
 
     if (collapsed) {
       toolbarHost.append(h("button.qr-tab", { "aria-label": "Open Reformatter toolbar", onclick: () => { collapsed = false; renderToolbar(); } },
-        h("span", { "aria-hidden": "true", style: { fontSize: "18px", lineHeight: 1 } }, "‹"), h("span.qr-tab-word", {}, "Reformatter")));
+        icon("left", 16), h("span.qr-tab-word", {}, "Reformatter")));
       return;
     }
     const busy = working > 0;
     const head = h("div.qr-tb-head", {},
       h("span.qr-tb-title", {}, "Reformatter"),
-      h("button.qr-btn", { "aria-label": "Settings", onclick: openSettings }, gearIcon()),
-      h("button.qr-btn", { "aria-label": "Collapse toolbar", onclick: () => { collapsed = true; renderToolbar(); } }, "›"));
+      h("button.qr-btn", { "aria-label": "Settings", onclick: openSettings }, icon("gear", 19)),
+      h("button.qr-btn", { "aria-label": "Collapse toolbar", onclick: () => { collapsed = true; renderToolbar(); } }, icon("right", 18)));
 
     if (QUESTION_SITE) {
       toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Question Reformatter" }, head,
@@ -104,18 +104,7 @@
     renderToolbar();
   }
 
-  function gearIcon() {
-    const NS = "http://www.w3.org/2000/svg";
-    const svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("width", "20"); svg.setAttribute("height", "20"); svg.setAttribute("viewBox", "0 0 24 24");
-    svg.setAttribute("fill", "none"); svg.setAttribute("stroke", "currentColor"); svg.setAttribute("stroke-width", "2");
-    svg.setAttribute("stroke-linecap", "round"); svg.setAttribute("stroke-linejoin", "round"); svg.setAttribute("aria-hidden", "true");
-    const c = document.createElementNS(NS, "circle"); c.setAttribute("cx", "12"); c.setAttribute("cy", "12"); c.setAttribute("r", "3");
-    const p = document.createElementNS(NS, "path");
-    p.setAttribute("d", "M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z");
-    svg.append(c, p);
-    return svg;
-  }
+
 
 
   // ---------------------------------------------------------------- settings pop-up
@@ -137,9 +126,9 @@
     if (toastEl) toastEl.remove();
     clearTimeout(toastTimer);
     toastEl = rootAttrs(h(`div.qr-toast${collapsed ? ".qr-toast-collapsed" : ""}`, { role: "status" },
-      h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
+      icon("info", 20),
       h("span", { style: { flex: 1 } }, msg),
-      h("button.qr-btn", { "aria-label": "Dismiss message", onclick: () => toastEl && toastEl.remove() }, "✕")), true);
+      h("button.qr-btn", { "aria-label": "Dismiss message", onclick: () => toastEl && toastEl.remove() }, icon("close", 16))), true);
     document.body.appendChild(toastEl);
     toastTimer = setTimeout(() => toastEl && toastEl.remove(), 7000);
   }
@@ -491,7 +480,7 @@
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); processReading(el); },
         onmouseenter: () => el.classList.add("qr-suggest-target"),
         onmouseleave: () => el.classList.remove("qr-suggest-target") },
-        h("span", { "aria-hidden": "true" }, "✓"), "Simplify"), false);
+        icon("check", 13), "Simplify"), false);
       el.appendChild(btn);
       suggestCount++;
       queuePrefetch(el);
@@ -576,7 +565,7 @@
 
   // Word count, sentence length, share of long words, and a reading grade (Flesch–Kincaid).
   function textStats(raw) {
-    const t = raw.replace(/✓\s*Simplify/g, "").replace(/\s+/g, " ").trim();
+    const t = raw.replace(/\bSimplify\s*$/g, "").replace(/\s+/g, " ").trim();
     if (t.length < 100) return null;
     const words = t.split(" ").filter((w) => /[A-Za-z]/.test(w));
     if (words.length < 15) return null;
@@ -622,7 +611,7 @@
 
   // ---------------------------------------------------------------- preparing rewrites ahead of time
   // With the free on-device model, suggested paragraphs are simplified in the background,
-  // nearest to where you're reading first, one at a time. Clicking ✓ Simplify then opens instantly.
+  // nearest to where you're reading first, one at a time. Clicking Simplify then opens instantly.
   // Never uses Claude, so it never costs anything.
 
   const PREFETCH_MAX = 40; // per page
@@ -670,7 +659,7 @@
     }
   }
 
-  // Selecting text anywhere offers ✓ Simplify for just that selection.
+  // Selecting text anywhere offers Simplify for just that selection.
   let selBtn = null;
   function hideSelBtn() { if (selBtn) { selBtn.remove(); selBtn = null; } }
   document.addEventListener("mousedown", (e) => { if (selBtn && !selBtn.contains(e.target)) hideSelBtn(); }, true);
@@ -689,7 +678,7 @@
       selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Simplify the selected text",
         style: { top: Math.max(8, rect.bottom + 8) + "px", left: Math.max(8, Math.min(window.innerWidth - 140, rect.left)) + "px" },
         onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); hideSelBtn(); processSelection(range, text); } },
-        h("span", { "aria-hidden": "true" }, "✓"), "Simplify"), false);
+        icon("check", 13), "Simplify"), false);
       document.body.appendChild(selBtn);
     }, 10);
   }, true);
@@ -729,20 +718,22 @@
     function header() {
       return h("div.qr-header", {},
         h("div.qr-header-actions", {},
-          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "✨ Better with Claude"),
+          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "Better with Claude"),
           data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; setOriginalHidden(!showOriginal); draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
-          h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, "✕")));
+          h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, icon("close", 17))));
     }
 
     function loading() {
       panel.textContent = "";
-      panel.append(header(), h("p.qr-loading", { role: "status" }, opts.reading ? "Simplifying…" : "Reformatting…"));
+      panel.append(header(), h("div.qr-loading", { role: "status" },
+        h("span.qr-loading-bar", { "aria-hidden": "true" }),
+        h("span.qr-loading-text", {}, opts.reading ? "Simplifying…" : "Reformatting…")));
     }
 
     function error(msg, retry) {
       panel.textContent = "";
       panel.append(header(), h("div.qr-warn", { role: "status" },
-        h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
+        icon("info", 22),
         h("div", { style: { display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 } },
           h("p.qr-warn-title", {}, "Couldn't simplify this yet"),
           h("p.qr-warn-text", {}, msg),
@@ -794,14 +785,15 @@
       if (last < text.length) target.append(document.createTextNode(text.slice(last)));
     }
 
-    const row = (str, mark = "◦", cls = "") => h(`div.qr-row${cls}`, {}, h("span.qr-mark", { "aria-hidden": "true" }, mark), h("span.qr-text", {}, rich(str)));
-    const label = (txt) => h("div.qr-label", {}, h("span", { "aria-hidden": "true" }, "•"), h("span", {}, txt));
+    // Bullets are drawn with CSS (no text symbols), so they look the same everywhere.
+    const row = (str, mark = null, cls = "") => h(`div.qr-row${cls}`, {}, h(`span.qr-mark${mark ? ".qr-mark-text" : ""}`, { "aria-hidden": "true" }, mark), h("span.qr-text", {}, rich(str)));
+    const label = (txt) => h("div.qr-label", {}, h("span", {}, txt));
 
     function section(heading, points) {
       const sec = h("section.qr-sec", { "aria-label": heading }, label(heading));
       points.forEach((p) => {
         sec.append(row(p.text));
-        (p.sub || []).forEach((x) => sec.append(row(x, "▪", ".qr-sub")));
+        (p.sub || []).forEach((x) => sec.append(row(x, null, ".qr-sub")));
       });
       return sec;
     }
@@ -822,8 +814,8 @@
             h(`button.qr-btn.qr-btn-icon${i === part ? ".qr-tab-on" : ""}`, { "aria-label": "Part " + letterOf(t), "aria-current": i === part ? "step" : null, onclick: () => { part = i; draw(); } }, letterOf(t))))),
         h("p.qr-text", {}, h("span.qr-part-tag", {}, `(${letterOf(cur)}) `), rich(cur.replace(/^(<[bi]>)*\([a-h]\)\s*/, "$1"))),
         h("div.qr-step-nav", {},
-          h("button.qr-btn", { disabled: part <= 0, onclick: () => { part--; draw(); } }, "‹ Previous part"),
-          h("button.qr-btn", { disabled: part >= parts.length - 1, onclick: () => { part++; draw(); } }, "Next part ›"))));
+          h("button.qr-btn", { disabled: part <= 0, onclick: () => { part--; draw(); } }, icon("left", 16), "Previous part"),
+          h("button.qr-btn", { disabled: part >= parts.length - 1, onclick: () => { part++; draw(); } }, "Next part", icon("right", 16)))));
       return sec;
     }
 
@@ -853,7 +845,7 @@
         const btn = h(`button.qr-choice${isSel ? ".qr-selected" : ""}${isPend ? ".qr-pending" : ""}`, { "aria-pressed": String(isSel), onclick: () => { if (!isSel && info) { pending = i; draw(); } } },
           h("span.qr-letter", {}, letter + "."),
           h("span.qr-choice-text", {}, rich(c)),
-          isSel && h("span.qr-tag-sel", {}, "✓ Selected"),
+          isSel && h("span.qr-tag-sel", {}, icon("check", 13), "Selected"),
           isPend && h("span.qr-tag-pend", {}, "Confirm?"));
         const wrap = h("div.qr-choice-wrap", {}, btn);
         if (isPend) {
@@ -889,7 +881,7 @@
       panel.append(header());
       if (meta.warnings && meta.warnings.length) {
         panel.append(h("div.qr-warn", { role: "status" },
-          h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
+          icon("info", 22),
           h("div", { style: { display: "flex", flexDirection: "column", gap: "4px", minWidth: 0 } },
             h("p.qr-warn-title", {}, meta.warnTitle),
             h("p.qr-warn-text", {}, meta.warnText),
