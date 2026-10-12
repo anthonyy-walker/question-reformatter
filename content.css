@@ -268,6 +268,8 @@ body.qr-picking, body.qr-picking * { cursor: pointer !important; }
   text-decoration: none; text-transform: none; box-shadow: none; float: none;
 }
 .qr-suggest.qr-root:hover { background: var(--qr-accent); color: var(--qr-accent-ink); }
+.qr-suggest.qr-root.qr-preparing { border-style: dashed; }
+.qr-suggest.qr-root.qr-ready { background: var(--qr-accent); color: var(--qr-accent-ink); }
 .qr-suggest.qr-root span { font-weight: 700; }
 .qr-sel-btn.qr-root { position: fixed; z-index: 2147483600; margin: 0; box-shadow: var(--qr-shadow); }
 .qr-suggest-target { outline: 2px dashed #1F5F5B !important; outline-offset: 4px !important; }

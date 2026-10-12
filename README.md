@@ -19,7 +19,9 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 
 ## Use
 - **Any website**
-  - ✓ Simplify buttons appear on hard-to-read paragraphs. Nothing is sent to the AI until you click one.
+  - ✓ Simplify buttons appear on hard-to-read paragraphs.
+  - **Ready ahead of time (free model):** suggested paragraphs are simplified in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
+  - **How paragraphs are found:** every visible piece of text is grouped by the box it sits in (so text split across links, bold, spans or line breaks still counts), then scored: long, or medium-length and hard to read (reading grade 12+, long sentences, many long words), or short but very hard (grade 16+). Works inside embedded frames and web components too. Menus, footers, forms, buttons and code are skipped.
   - Select text (12+ words) → ✓ Simplify appears next to it.
   - The small **Reformatter** tab on the right edge opens the toolbar: **Pick text to simplify**, **Turn off for this site**, settings.
 - **Gradescope**

@@ -25,7 +25,9 @@
 
   // ---------------------------------------------------------------- startup
 
-  if (window.top !== window && !QUESTION_SITE) return; // reading mode: skip ads/embeds in frames
+  // Frames: run reading mode inside real content frames (e.g. course pages), skip tiny ones (ads, widgets).
+  const IN_FRAME = window.top !== window;
+  if (IN_FRAME && (QUESTION_SITE || innerWidth < 320 || innerHeight < 200)) return;
 
   loadSettings().then((s) => {
     settings = s;
@@ -42,7 +44,7 @@
 
   chrome.storage.onChanged.addListener((changes) => {
     let touched = false;
-    ["textSize", "theme", "apiKey", "model", "suggest", "offSites"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
+    ["textSize", "theme", "apiKey", "model", "suggest", "offSites", "provider", "prefetch"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
     if (changes.offSites || changes.suggest) { siteOff = (settings.offSites || []).includes(HOST); refreshSuggestions(); }
     if (touched) { applyLook(); renderToolbar(); }
   });
@@ -62,6 +64,7 @@
   // ---------------------------------------------------------------- toolbar
 
   function renderToolbar() {
+    if (IN_FRAME) return; // one toolbar per tab, in the top page
     if (!toolbarHost) { toolbarHost = rootAttrs(h("div.qr-toolbar-host"), true); document.body.appendChild(toolbarHost); }
     rootAttrs(toolbarHost, true);
     toolbarHost.classList.toggle("qr-collapsed", collapsed);
@@ -446,8 +449,8 @@
 
   // ---------------------------------------------------------------- reading mode (any website)
 
-  const SKIP_AREAS = "nav,header,footer,aside,form,button,select,textarea,input,pre,code,kbd,[contenteditable],[role=navigation],[role=banner],[role=contentinfo],[role=menu],[role=dialog],[aria-hidden=true],[data-qr]";
-  const MAX_SUGGEST = 40;
+  const SKIP_AREAS = "nav,footer,form,button,select,textarea,input,pre,code,kbd,script,style,noscript,template,svg,math,iframe,[contenteditable=''],[contenteditable=true],[role=navigation],[role=banner],[role=contentinfo],[role=menu],[role=menubar],[role=toolbar],[role=dialog],[role=alert],[aria-hidden=true],[data-qr]";
+  const MAX_SUGGEST = 80;
   let suggestCount = 0, scanTimer = null;
   const readingPanels = new Map(); // element -> panel
 
@@ -457,82 +460,152 @@
       if (muts.every((m) => m.target.closest && m.target.closest("[data-qr]"))) return;
       clearTimeout(scanTimer);
       scanTimer = setTimeout(refreshSuggestions, 1200);
-    }).observe(document.body, { childList: true, subtree: true });
+    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+    // Pages that load content as you scroll
+    addEventListener("scroll", () => { clearTimeout(scanTimer); scanTimer = setTimeout(refreshSuggestions, 900); }, { passive: true });
   }
 
   function refreshSuggestions() {
     if (QUESTION_SITE) return;
     const on = settings.suggest !== false && !siteOff;
     if (!on) {
-      document.querySelectorAll(".qr-suggest").forEach((b) => b.remove());
-      document.querySelectorAll("[data-qr-suggested]").forEach((e) => e.removeAttribute("data-qr-suggested"));
+      deepQueryAll(".qr-suggest").forEach((b) => b.remove());
+      deepQueryAll("[data-qr-suggested]").forEach((e) => e.removeAttribute("data-qr-suggested"));
+      prefetchQueue.clear();
       suggestCount = 0;
       renderToolbar();
       return;
     }
-    let added = 0;
-    suggestCount = document.querySelectorAll(".qr-suggest:not(.qr-sel-btn)").length;
+    suggestCount = deepQueryAll(".qr-suggest:not(.qr-sel-btn)").length;
     for (const el of findDenseParagraphs()) {
       if (suggestCount >= MAX_SUGGEST) break;
       if (el.hasAttribute("data-qr-suggested") || readingPanels.has(el)) continue;
       el.setAttribute("data-qr-suggested", "1");
+      styleShadowRoot(el);
       const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Simplify this paragraph",
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); processReading(el); },
         onmouseenter: () => el.classList.add("qr-suggest-target"),
         onmouseleave: () => el.classList.remove("qr-suggest-target") },
         h("span", { "aria-hidden": "true" }, "✓"), "Simplify"), false);
       el.appendChild(btn);
-      suggestCount++; added++;
+      suggestCount++;
+      queuePrefetch(el);
     }
     if (!collapsed) renderToolbar();
   }
 
-  // A paragraph is suggested when it's long, or medium-length with long sentences or many long words.
-  function findDenseParagraphs() {
-    const out = [];
-    const cands = document.querySelectorAll("p, li, dd, blockquote, td, figcaption, div, section, article");
-    for (const el of cands) {
-      if (el.closest(SKIP_AREAS)) continue;
-      if (el.tagName === "DIV" || el.tagName === "SECTION" || el.tagName === "ARTICLE") {
-        // only text containers: own text, no block children holding the text
-        const own = [...el.childNodes].filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join(" ").trim();
-        if (own.split(/\s+/).length < 30) continue;
-        if (el.querySelector("p,li,div,section,article,table")) continue;
-      }
-      if (el.tagName === "LI" && el.querySelector("p,ul,ol")) continue;
-      if (el.tagName === "TD" && el.querySelector("p,div,table")) continue;
-      const stats = textStats(el);
-      if (!stats) continue;
-      const { words, avgSentence, longShare } = stats;
-      const dense = words >= 70 || (words >= 40 && (avgSentence >= 22 || longShare >= 0.3));
-      if (!dense) continue;
-      const r = el.getBoundingClientRect();
-      if (r.width < 200 || r.height < 30) continue;
-      const cs = getComputedStyle(el);
-      if (cs.display === "none" || cs.visibility === "hidden") continue;
-      out.push(el);
-    }
-    // keep the innermost text blocks only
-    return out.filter((n) => !out.some((m) => m !== n && n.contains(m)));
+  // querySelectorAll that also looks inside open shadow roots.
+  function deepQueryAll(sel, root = document) {
+    const out = [...root.querySelectorAll(sel)];
+    root.querySelectorAll("*").forEach((el) => { if (el.shadowRoot) out.push(...deepQueryAll(sel, el.shadowRoot)); });
+    return out;
   }
 
-  function textStats(el) {
-    const t = (el.innerText || "").replace(/✓\s*Simplify/g, "").replace(/\s+/g, " ").trim();
-    if (t.length < 200) return null;
-    const words = t.split(" ");
-    const sentences = Math.max(1, (t.match(/[.!?](\s|$)/g) || []).length);
+  // Our styles don't reach inside shadow roots, so give each one a copy.
+  let cssSheet = null;
+  const styledRoots = new WeakSet();
+  function styleShadowRoot(el) {
+    const root = el.getRootNode();
+    if (!(root instanceof ShadowRoot) || styledRoots.has(root)) return;
+    styledRoots.add(root);
+    (cssSheet ? Promise.resolve(cssSheet) : fetch(chrome.runtime.getURL("content.css")).then((r) => r.text()).then((css) => {
+      cssSheet = new CSSStyleSheet();
+      cssSheet.replaceSync(css.replace(/@font-face\s*{[^}]*}/g, ""));
+      return cssSheet;
+    })).then((sheet) => { root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet]; }).catch(() => {});
+  }
+
+  // How paragraphs are found:
+  //   1. Walk every visible text node on the page (and inside open shadow roots).
+  //   2. Group text by its nearest block-level box (whatever the tag is: p, div, span-with-display-block, li…).
+  //      This catches text split across links, bold, spans and <br> lines.
+  //   3. Score each block: long, OR medium-length and hard to read
+  //      (reading grade 12+, long sentences, or many long words).
+  function findDenseParagraphs() {
+    const styleOf = new Map();
+    const style = (el) => {
+      let v = styleOf.get(el);
+      if (!v) { const cs = getComputedStyle(el); v = { display: cs.display, hidden: cs.display === "none" || cs.visibility === "hidden" || cs.visibility === "collapse" }; styleOf.set(el, v); }
+      return v;
+    };
+    const blockish = (el) => { const d = style(el).display; return !(d.startsWith("inline") || d === "contents" || d === "ruby"); };
+    const skipEl = (el) => el.matches(SKIP_AREAS) || (el.matches("header,aside") && !el.closest("article,main")) || style(el).hidden;
+    const up = (el) => el.parentElement || (el.parentNode && el.parentNode.host) || null;
+
+    const text = new Map();
+    const roots = [document.body];
+    for (let i = 0; i < roots.length; i++) {
+      const walker = document.createTreeWalker(roots[i], NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+        acceptNode(n) {
+          if (n.nodeType === 1) {
+            if (skipEl(n)) return NodeFilter.FILTER_REJECT;
+            if (n.shadowRoot) roots.push(n.shadowRoot);
+            return NodeFilter.FILTER_SKIP;
+          }
+          return /\S/.test(n.nodeValue) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP;
+        },
+      });
+      let t;
+      while ((t = walker.nextNode())) {
+        let b = t.parentElement || (t.parentNode && t.parentNode.host);
+        while (b && b !== document.body && !blockish(b)) b = up(b);
+        if (!b || b === document.body || b === document.documentElement) continue;
+        text.set(b, (text.get(b) || "") + t.nodeValue + " ");
+      }
+    }
+
+    const out = [];
+    text.forEach((t, el) => {
+      const st = textStats(t);
+      if (!st) return;
+      const dense = st.words >= 60 ||
+        (st.words >= 30 && (st.grade >= 12 || st.avgSentence >= 20 || st.longShare >= 0.28)) ||
+        (st.words >= 15 && st.grade >= 16); // short but very hard (academic jargon)
+      if (!dense) return;
+      const r = el.getBoundingClientRect();
+      if (r.width < 180 || r.height < 20) return;
+      out.push(el);
+    });
+    return out;
+  }
+
+  // Word count, sentence length, share of long words, and a reading grade (Flesch–Kincaid).
+  function textStats(raw) {
+    const t = raw.replace(/✓\s*Simplify/g, "").replace(/\s+/g, " ").trim();
+    if (t.length < 100) return null;
+    const words = t.split(" ").filter((w) => /[A-Za-z]/.test(w));
+    if (words.length < 15) return null;
+    const sentences = Math.max(1, (t.match(/[.!?;:](\s|$)/g) || []).length);
+    const syllables = words.reduce((n, w) => n + syllableCount(w), 0);
     const longShare = words.filter((w) => w.replace(/[^A-Za-z]/g, "").length >= 9).length / words.length;
-    return { words: words.length, avgSentence: words.length / sentences, longShare };
+    const avgSentence = words.length / sentences;
+    const grade = 0.39 * avgSentence + 11.8 * (syllables / words.length) - 15.59;
+    return { words: words.length, avgSentence, longShare, grade };
+  }
+  function syllableCount(word) {
+    const w = word.toLowerCase().replace(/[^a-z]/g, "");
+    if (!w) return 0;
+    if (w.length <= 3) return 1;
+    const groups = w.replace(/(?:[^laeiouy]es|ed|[^laeiouy]e)$/, "").replace(/^y/, "").match(/[aeiouy]{1,2}/g);
+    return Math.max(1, groups ? groups.length : 1);
+  }
+
+  // The same text is read for preparing ahead and for clicking, so the saved result matches.
+  function readingRead(el) {
+    const math = newMathRegistry();
+    let text = extractRich(el, { skip: new Set(), math });
+    if (F.plain(text).replace(/\s+/g, " ").trim().split(" ").length < 8) return null;
+    if (text.length > 8000) text = text.slice(0, 8000);
+    return { text, choices: [], choiceInfo: [], math: math.list, title: "this paragraph" };
   }
 
   function processReading(el) {
     if (readingPanels.has(el)) return;
-    const math = newMathRegistry();
-    let text = extractRich(el, { skip: new Set(), math });
-    if (F.plain(text).replace(/\s+/g, " ").trim().split(" ").length < 8) { toast("That's too short to simplify. Pick a longer paragraph."); return; }
-    if (text.length > 8000) text = text.slice(0, 8000);
-    const read = { text, choices: [], choiceInfo: [], math: math.list, title: "this paragraph" };
+    const read = readingRead(el);
+    if (!read) { toast("That's too short to simplify. Pick a longer paragraph."); return; }
+    prefetchQueue.delete(el);
     const btn = el.querySelector(":scope > .qr-suggest"); if (btn) { btn.remove(); suggestCount = Math.max(0, suggestCount - 1); }
+    styleShadowRoot(el);
     const ctrl = makePanel(el, read, () => {
       readingPanels.delete(el);
       el.removeAttribute("data-qr-suggested"); // offer it again later
@@ -540,6 +613,55 @@
     }, { reading: true, hideTarget: el });
     readingPanels.set(el, ctrl);
     runAI(ctrl, read, { kind: "reading" });
+  }
+
+  // ---------------------------------------------------------------- preparing rewrites ahead of time
+  // With the free on-device model, suggested paragraphs are simplified in the background,
+  // nearest to where you're reading first, one at a time. Clicking ✓ Simplify then opens instantly.
+  // Never uses Claude, so it never costs anything.
+
+  const PREFETCH_MAX = 40; // per page
+  const prefetchQueue = new Set();
+  let prefetching = false, prefetched = 0;
+  const send = (m) => new Promise((res) => chrome.runtime.sendMessage(m, (r) => { void chrome.runtime.lastError; res(r); }));
+
+  function queuePrefetch(el) {
+    if (settings.prefetch === false || (settings.provider || "local") !== "local") return;
+    prefetchQueue.add(el);
+    pumpPrefetch();
+  }
+
+  async function pumpPrefetch() {
+    if (prefetching) return;
+    prefetching = true;
+    try {
+      while (prefetchQueue.size && prefetched < PREFETCH_MAX && !siteOff) {
+        if (document.hidden) { await new Promise((r) => document.addEventListener("visibilitychange", r, { once: true })); continue; }
+        let best = null, bestDist = Infinity;
+        for (const el of prefetchQueue) {
+          if (!el.isConnected || readingPanels.has(el)) { prefetchQueue.delete(el); continue; }
+          const r = el.getBoundingClientRect();
+          const dist = r.bottom < 0 ? -r.bottom + 1500 : Math.max(0, r.top - innerHeight); // below the screen first, then above
+          if (dist < bestDist) { bestDist = dist; best = el; }
+        }
+        if (!best) break;
+        prefetchQueue.delete(best);
+        const read = readingRead(best);
+        if (!read) continue;
+        const btn = best.querySelector(":scope > .qr-suggest");
+        if (btn) { btn.classList.add("qr-preparing"); btn.title = "Getting it ready…"; }
+        const resp = await send({ type: "QR_AI_REFORMAT", kind: "reading", prefetch: true, text: read.text, choices: [], math: read.math.map(({ token, text }) => ({ token, text })) });
+        prefetched++;
+        if (btn) {
+          btn.classList.remove("qr-preparing");
+          if (resp && resp.ok && resp.result.structured) { btn.classList.add("qr-ready"); btn.title = "Ready — opens instantly"; }
+          else btn.title = "Rewrite this paragraph in plain language";
+        }
+        if (resp && resp.ok && resp.result.skipped) { prefetchQueue.clear(); break; } // free model not available here
+      }
+    } finally {
+      prefetching = false;
+    }
   }
 
   // Selecting text anywhere offers ✓ Simplify for just that selection.

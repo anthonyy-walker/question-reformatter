@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Question Reformatter",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Rewrites dense text in plain, simple language \u2014 Gradescope questions and long paragraphs on any website. Never solves or hints.",
   "permissions": [
     "storage",
@@ -28,13 +28,16 @@
       "css": [
         "content.css"
       ],
-      "run_at": "document_idle"
+      "run_at": "document_idle",
+      "all_frames": true,
+      "match_origin_as_fallback": true
     }
   ],
   "web_accessible_resources": [
     {
       "resources": [
-        "fonts/*.woff2"
+        "fonts/*.woff2",
+        "content.css"
       ],
       "matches": [
         "<all_urls>"

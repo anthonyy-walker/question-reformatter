@@ -45,7 +45,12 @@ function cacheKeyInput({ text, choices, math, kind }, model) {
 
 // ---------- main flow ----------
 
-async function reformat({ text, choices, math, forceFresh, cacheOnly, kind }) {
+// Rewrites being made right now (so a click waits for the one already in progress)
+// and a queue so background preparing runs one at a time across all tabs.
+const inflight = new Map();
+let prefetchLock = Promise.resolve();
+
+async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, prefetch }) {
   const reading = kind === "reading";
   choices = reading ? [] : choices || [];
   const { apiKey, model: chosen, provider } = await chrome.storage.local.get(["apiKey", "model", "provider"]);
@@ -65,6 +70,14 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind }) {
     }
   }
   if (cacheOnly) return { miss: true };
+
+  const localKey = await keyFor(LOCAL_MODEL);
+  if (inflight.has(localKey)) {
+    try {
+      const done = await inflight.get(localKey);
+      if (done && done.structured) return { ...done, cached: true };
+    } catch (_) { /* make it again below */ }
+  }
 
   const mathText = Object.fromEntries((math || []).map((m) => [m.token, m.text]));
   const check = (s) => QRFormatter.checkSimple(text, choices, s, mathText, { reading });
@@ -90,6 +103,31 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind }) {
     return { structured, problems, model: which === "local" ? LOCAL_MODEL : claudeModel, via: which };
   }
 
+  async function finish(r) {
+    // Anything still wrong is patched with the original's own words. The rewrite is never thrown away.
+    let structured = r.structured;
+    if (r.problems.length) structured = QRFormatter.repairSimple(text, choices, structured, mathText, { reading });
+    const now = Date.now();
+    await chrome.storage.local.set({ [await keyFor(r.model)]: { structured, via: r.via, savedAt: now, lastUsed: now } });
+    prune();
+    return { structured, cached: false, via: r.via };
+  }
+
+  // Preparing ahead of time: free on-device model only, one at a time, never Claude.
+  if (prefetch) {
+    if ((provider || "local") !== "local") return { skipped: true };
+    const job = prefetchLock.then(() => {
+      const p = (async () => {
+        if ((await localStatus()) !== "available") return { skipped: true };
+        return finish(await attempt("local"));
+      })();
+      inflight.set(localKey, p);
+      return p.finally(() => inflight.delete(localKey));
+    });
+    prefetchLock = job.catch(() => {});
+    return job;
+  }
+
   let r;
   if ((provider || "local") === "local") {
     const status = await localStatus();
@@ -113,14 +151,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind }) {
     r = await attempt("claude");
   }
 
-  // Anything still wrong is patched with the original's own words. The rewrite is never thrown away.
-  let structured = r.structured;
-  if (r.problems.length) structured = QRFormatter.repairSimple(text, choices, structured, mathText, { reading });
-
-  const now = Date.now();
-  await chrome.storage.local.set({ [await keyFor(r.model)]: { structured, via: r.via, savedAt: now, lastUsed: now } });
-  prune();
-  return { structured, cached: false, via: r.via };
+  return finish(r);
 }
 
 // ---------- providers ----------
