@@ -119,14 +119,14 @@
             const on = suggestOn === v;
             return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.suggest = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "When on, long or dense paragraphs get a small Simplify button." }),
+        h("span.qr-help", { text: "When on, long or dense paragraphs get a small Reformat button." }),
         h("div.qr-legend", { text: "Get rewrites ready ahead of time", style: { marginTop: "10px" } }),
         h("div.qr-seg", { role: "radiogroup", "aria-label": "Get rewrites ready ahead of time" },
           [[true, "On"], [false, "Off"]].map(([v, name]) => {
             const on = (draft.prefetch !== false) === v;
             return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.prefetch = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "Free model only. Suggested paragraphs are simplified in the background, closest to where you're reading first, so Simplify opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
+        h("span.qr-help", { text: "Free model only. Suggested paragraphs are reformatted in the background, closest to where you're reading first, so Reformat opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
         offList.length
           ? h("div.qr-saved-row", {}, h("span", {}, "Turned off on: "), offList.map((host) =>
               h("button.qr-btn", { "aria-label": "Turn back on for " + host, onclick: () => { draft.offSites = offList.filter((x) => x !== host); render(); } }, host, icon("close", 14))))
@@ -160,7 +160,7 @@
       const saved = h("div.qr-fieldset", {},
         h("div.qr-legend", { text: "Saved AI results" }),
         h("div.qr-saved-row", {}, h("span", {}, "Saved on this device: ", savedCount), clearBtn),
-        h("span.qr-help", { text: "Simplifying the same text again (same page, another day) re-uses these, so it costs nothing. They are re-made automatically if the AI instructions or model change." }));
+        h("span.qr-help", { text: "Reformatting the same text again (same page, another day) re-uses these, so it costs nothing. They are re-made automatically if the AI instructions or model change." }));
 
       // Exact instructions disclosure
       const instr = h("div.qr-instr-wrap", {});

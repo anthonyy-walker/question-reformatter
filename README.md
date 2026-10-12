@@ -2,7 +2,7 @@
 
 A Chrome extension that rewrites dense text in plain, simple language — for students with dyslexia, autism, ADHD, or anyone who loses the point inside a long paragraph.
 
-- **On any website:** long or dense paragraphs get a small **Simplify** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers Simplify.
+- **On any website:** long or dense paragraphs get a small **Reformat** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers Reformat.
 - **On Gradescope:** questions are rewritten in plain language too, with stricter rules — it never solves, hints, rules out choices, or reorders answers. You still answer on the original question.
 - **Show original wording** brings back the exact original at any time.
 - **Short lines:** every bullet fits on one line (about 10 words), with at most 8 lines per section. Anything longer is split at a natural break into another bullet, and big sections continue under "(cont.)" — nothing is cut off.
@@ -20,14 +20,14 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 
 ## Use
 - **Any website**
-  - Simplify buttons appear on hard-to-read paragraphs.
-  - **Ready ahead of time (free model):** suggested paragraphs are simplified in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
+  - Reformat buttons appear on hard-to-read paragraphs.
+  - **Ready ahead of time (free model):** suggested paragraphs are reformatted in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
   - **How paragraphs are found:** every visible piece of text is grouped by the box it sits in (so text split across links, bold, spans or line breaks still counts), then scored: long, or medium-length and hard to read (reading grade 12+, long sentences, many long words), or short but very hard (grade 16+). Works inside embedded frames and web components too. Menus, footers, forms, buttons and code are skipped.
-  - Select text (12+ words) → Simplify appears next to it.
-  - The small **Reformatter** tab on the right edge opens the toolbar: **Pick text to simplify**, **Turn off for this site**, settings.
+  - Select text (12+ words) → Reformat appears next to it.
+  - The small **Reformatter** tab on the right edge opens the toolbar: **Pick text to reformat**, **Turn off for this site**, settings.
 - **Gradescope**
   - **Reformat questions** finds every question; **Pick a question** if auto-find misses one.
-  - Click a simplified answer choice → confirm → it selects that answer on the page.
+  - Click a reformatted answer choice → confirm → it selects that answer on the page.
 
 ## Look and feel
 - One design system everywhere: Atkinson Hyperlegible, one button style, one icon set, one radius scale.
@@ -51,7 +51,7 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 - Text from websites is treated as material only — instructions hidden inside a page are ignored.
 
 ## Saved results (no repeat cost)
-- Every result is saved on this device. Simplifying the same text again costs nothing.
+- Every result is saved on this device. Reformatting the same text again costs nothing.
 - On Gradescope, panels you had open re-appear when you return. A return visit never calls the AI on its own.
 - Settings → "Saved AI results" shows the count and has a Clear button.
 

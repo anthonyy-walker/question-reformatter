@@ -1,9 +1,9 @@
 // content.js — runs on every page.
 // • Gradescope (question mode): toolbar → find questions (or pick one) → a simpler
 //   version appears right ABOVE the original. You still answer on the original.
-// • Every other site (reading mode): long, dense paragraphs get a small Simplify
+// • Every other site (reading mode): long, dense paragraphs get a small Reformat
 //   button. Click it and the paragraph is swapped for a plain-language version.
-//   Selecting any text also offers Simplify. "Show original wording" brings it back.
+//   Selecting any text also offers Reformat. "Show original wording" brings it back.
 
 (function () {
   "use strict";
@@ -89,7 +89,7 @@
       return;
     }
     toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Reformatter" }, head,
-      h(`button.qr-btn${picking ? ".qr-pick-on" : ".qr-btn-primary"}`, { "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick text to simplify"),
+      h(`button.qr-btn${picking ? ".qr-pick-on" : ".qr-btn-primary"}`, { "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick text to reformat"),
       h("button.qr-btn", { "aria-pressed": String(!siteOff), onclick: toggleSite }, siteOff ? "Turn on for this site" : "Turn off for this site"),
       h("p.qr-tb-status", {}, siteOff ? "Off on " + HOST : `${suggestCount} paragraph${suggestCount === 1 ? "" : "s"} suggested here`)));
   }
@@ -140,7 +140,7 @@
     document.body.classList.toggle("qr-picking", picking);
     if (picking) {
       bannerEl = rootAttrs(h("div.qr-banner", { role: "status" },
-        h("span", {}, QUESTION_SITE ? "Click the question you want reformatted. Press Esc to cancel." : "Click the text you want simplified. Press Esc to cancel."),
+        h("span", {}, QUESTION_SITE ? "Click the question you want reformatted. Press Esc to cancel." : "Click the text you want reformatted. Press Esc to cancel."),
         h("button.qr-btn", { onclick: togglePicking }, "Cancel")), true);
       document.body.appendChild(bannerEl);
     } else {
@@ -476,11 +476,11 @@
       if (el.hasAttribute("data-qr-suggested") || readingPanels.has(el)) continue;
       el.setAttribute("data-qr-suggested", "1");
       styleShadowRoot(el);
-      const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Simplify this paragraph",
+      const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Reformat this paragraph",
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); processReading(el); },
         onmouseenter: () => el.classList.add("qr-suggest-target"),
         onmouseleave: () => el.classList.remove("qr-suggest-target") },
-        icon("check", 13), "Simplify"), false);
+        icon("check", 13), "Reformat"), false);
       el.appendChild(btn);
       suggestCount++;
       queuePrefetch(el);
@@ -565,7 +565,7 @@
 
   // Word count, sentence length, share of long words, and a reading grade (Flesch–Kincaid).
   function textStats(raw) {
-    const t = raw.replace(/\bSimplify\s*$/g, "").replace(/\s+/g, " ").trim();
+    const t = raw.replace(/\bReformat\s*$/g, "").replace(/\s+/g, " ").trim();
     if (t.length < 100) return null;
     const words = t.split(" ").filter((w) => /[A-Za-z]/.test(w));
     if (words.length < 15) return null;
@@ -596,7 +596,7 @@
   function processReading(el) {
     if (readingPanels.has(el)) return;
     const read = readingRead(el);
-    if (!read) { toast("That's too short to simplify. Pick a longer paragraph."); return; }
+    if (!read) { toast("That's too short to reformat. Pick a longer paragraph."); return; }
     prefetchQueue.delete(el);
     const btn = el.querySelector(":scope > .qr-suggest"); if (btn) { btn.remove(); suggestCount = Math.max(0, suggestCount - 1); }
     styleShadowRoot(el);
@@ -610,8 +610,8 @@
   }
 
   // ---------------------------------------------------------------- preparing rewrites ahead of time
-  // With the free on-device model, suggested paragraphs are simplified in the background,
-  // nearest to where you're reading first, one at a time. Clicking Simplify then opens instantly.
+  // With the free on-device model, suggested paragraphs are reformatted in the background,
+  // nearest to where you're reading first, one at a time. Clicking Reformat then opens instantly.
   // Never uses Claude, so it never costs anything.
 
   const PREFETCH_MAX = 40; // per page
@@ -659,7 +659,7 @@
     }
   }
 
-  // Selecting text anywhere offers Simplify for just that selection.
+  // Selecting text anywhere offers Reformat for just that selection.
   let selBtn = null;
   function hideSelBtn() { if (selBtn) { selBtn.remove(); selBtn = null; } }
   document.addEventListener("mousedown", (e) => { if (selBtn && !selBtn.contains(e.target)) hideSelBtn(); }, true);
@@ -675,10 +675,10 @@
       if (!anchorEl || anchorEl.closest("input,textarea,[contenteditable],[data-qr]")) return;
       const rect = range.getBoundingClientRect();
       hideSelBtn();
-      selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Simplify the selected text",
+      selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Reformat the selected text",
         style: { top: Math.max(8, rect.bottom + 8) + "px", left: Math.max(8, Math.min(window.innerWidth - 140, rect.left)) + "px" },
         onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); hideSelBtn(); processSelection(range, text); } },
-        icon("check", 13), "Simplify"), false);
+        icon("check", 13), "Reformat"), false);
       document.body.appendChild(selBtn);
     }, 10);
   }, true);
@@ -727,7 +727,7 @@
       panel.textContent = "";
       panel.append(header(), h("div.qr-loading", { role: "status" },
         h("span.qr-loading-bar", { "aria-hidden": "true" }),
-        h("span.qr-loading-text", {}, opts.reading ? "Simplifying…" : "Reformatting…")));
+        h("span.qr-loading-text", {}, "Reformatting…")));
     }
 
     function error(msg, retry) {
@@ -735,7 +735,7 @@
       panel.append(header(), h("div.qr-warn", { role: "status" },
         icon("info", 22),
         h("div", { style: { display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 } },
-          h("p.qr-warn-title", {}, "Couldn't simplify this yet"),
+          h("p.qr-warn-title", {}, "Couldn't reformat this yet"),
           h("p.qr-warn-text", {}, msg),
           h("div", {}, h("button.qr-btn", { onclick: retry }, "Try again")))));
     }
