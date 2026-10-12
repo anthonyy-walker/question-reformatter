@@ -5,6 +5,7 @@ A Chrome extension that rewrites dense text in plain, simple language — for st
 - **On any website:** long or dense paragraphs get a small **✓ Simplify** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers ✓ Simplify.
 - **On Gradescope:** questions are rewritten in plain language too, with stricter rules — it never solves, hints, rules out choices, or reorders answers. You still answer on the original question.
 - **Show original wording** brings back the exact original at any time.
+- **Short lines:** every bullet fits on one line (about 10 words), with at most 8 lines per section. Anything longer is split at a natural break into another bullet, and big sections continue under "(cont.)" — nothing is cut off.
 
 ## Install (Chrome)
 1. Clone or unzip this folder somewhere you'll keep it.

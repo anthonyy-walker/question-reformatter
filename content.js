@@ -443,7 +443,7 @@
       }
       if (resp.result.miss) { onMiss && onMiss(); return; }
       const via = resp.result.via;
-      ctrl.show(resp.result.structured, {
+      ctrl.show(F.tidyLines(resp.result.structured), {
         // Free result + a Claude key saved → offer a one-click better version (pay only when you want it).
         upgrade: via === "local" && settings.apiKey ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
       });

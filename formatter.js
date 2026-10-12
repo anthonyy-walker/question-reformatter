@@ -396,6 +396,75 @@
     return { source: "rules", sections, question: r.task || [], choices_intro: "", choices: r.choices || [] };
   }
 
-  root.QRFormatter = { checkSimple, repairSimple, rulesToSimple, simpleLines, repair, splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
+  // ---------- one line per bullet, at most 8 bullets per section ----------
+  // Long bullets are split at natural breaks (";", "—", ", and", ", but"…) into extra bullets,
+  // so nothing is cut off and every bullet stays on one line. Sections over 8 lines continue
+  // under the same heading with "(cont.)".
+  const LINE_CHARS = 72;
+  // Best breaks first. Plain commas and "and" are never used, so lists like "A, B, and C" stay whole.
+  const SPLITS = [
+    [". ", false], ["; ", false], [" — ", false], [" – ", false], [": ", false], [", but ", false], [", so ", false],
+    [", because ", false], [", while ", false], [", which ", false], [", and ", true], [" because ", false],
+  ];
+  const visLen = (t) => plain(String(t).replace(TOKEN_RE, "xxxxxxxxxxxx")).length;
+
+  function splitLine(line, depth = 0) {
+    if (visLen(line) <= LINE_CHARS || depth > 4) return [line];
+    const mid = line.length / 2;
+    for (const [sep, dropConj] of SPLITS) {
+      let best = -1;
+      for (let i = line.indexOf(sep); i !== -1; i = line.indexOf(sep, i + 1)) {
+        const left = line.slice(0, i), right = line.slice(i + sep.length);
+        if (visLen(left) < 20 || visLen(right) < 15) continue;
+        if (/<[bi]>[^<]*$/.test(left)) continue; // don't split inside bold/italic
+        if (sep === ", and " && /,[^,]{0,30}$/.test(left)) continue; // "A, B, and C" is a list, not two ideas
+        if (sep === ". " && /\b(Dr|Prof|Mr|Ms|Mrs|St|vs|e\.g|i\.e|etc|No|Fig|U\.S)$/.test(left)) continue; // abbreviations
+        if (best === -1 || Math.abs(i - mid) < Math.abs(best - mid)) best = i;
+      }
+      if (best !== -1) {
+        let left = line.slice(0, best).replace(/[,:;]$/, "");
+        if (sep === ". ") left = line.slice(0, best + 1);
+        else if (sep.trim() === ";") left = line.slice(0, best) + ".";
+        else if (sep.trim() === ":") left = line.slice(0, best + 1);
+        let right = line.slice(best + sep.length);
+        if (!dropConj && /^(but|so|because|while|which)$/.test(sep.replace(/[ ,]/g, ""))) right = sep.replace(/[ ,]/g, "") + " " + right;
+        right = right.replace(/^(<[bi]>)?([a-z])/, (m, tag, c) => (tag || "") + c.toUpperCase());
+        return [...splitLine(left, depth + 1), ...splitLine(right, depth + 1)];
+      }
+    }
+    return [line];
+  }
+
+  function tidyLines(s) {
+    if (!s || !Array.isArray(s.sections)) return s;
+    const sections = [];
+    s.sections.forEach((sec) => {
+      const points = [];
+      (sec.points || []).forEach((p) => {
+        const parts = splitLine(p.text || "");
+        const subs = (p.sub || []).flatMap((x) => splitLine(x));
+        points.push({ text: parts[0], sub: [...parts.slice(1), ...subs] });
+      });
+      // at most 8 lines per section
+      let chunk = [], count = 0, n = 0;
+      const flush = () => { if (chunk.length) sections.push({ heading: n++ ? `${sec.heading} (cont.)` : sec.heading, points: chunk }); chunk = []; count = 0; };
+      points.forEach((p) => {
+        const lines = 1 + p.sub.length;
+        if (count + lines > 8 && chunk.length) flush();
+        if (lines > 8) {
+          // a point with many sub-points: spread its sub-points over several sections
+          let subs = p.sub.slice();
+          chunk.push({ text: p.text, sub: subs.splice(0, 7) }); flush();
+          while (subs.length) { chunk.push({ text: subs.shift(), sub: subs.splice(0, 7) }); flush(); }
+          return;
+        }
+        chunk.push(p); count += lines;
+      });
+      flush();
+    });
+    return { ...s, sections };
+  }
+
+  root.QRFormatter = { tidyLines, splitLine, checkSimple, repairSimple, rulesToSimple, simpleLines, repair, splitSentences, splitParts, extractNumbers, ruleFormat, validate, plain, tokens, normalizeSpace, NEGATION_RE, NUMBER_RE, TOKEN_RE };
   if (typeof module !== "undefined" && module.exports) module.exports = root.QRFormatter;
 })(typeof globalThis !== "undefined" ? globalThis : this);

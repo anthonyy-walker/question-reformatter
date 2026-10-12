@@ -70,7 +70,7 @@
   }
 
   // JSON shapes the model is forced to follow — with size caps so answers stay short (= fast).
-  const point = { type: "object", properties: { text: { type: "string" }, sub: { type: "array", items: { type: "string" }, maxItems: 3 } }, required: ["text"] };
+  const point = { type: "object", properties: { text: { type: "string" }, sub: { type: "array", items: { type: "string" }, maxItems: 2 } }, required: ["text"] };
   const sections = { type: "array", maxItems: 4, items: { type: "object", properties: { heading: { type: "string" }, points: { type: "array", items: point, maxItems: 5 } }, required: ["heading", "points"] } };
   const SCHEMAS = {
     question: { type: "object", properties: { sections, question: { type: "array", items: { type: "string" } }, choices_intro: { type: "string" }, choices: { type: "array", items: { type: "string" } } }, required: ["sections", "question", "choices"] },
