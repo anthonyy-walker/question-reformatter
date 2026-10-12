@@ -20,6 +20,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
     QR_CACHE_STATS: () => cacheStats(),
     QR_CACHE_CLEAR: () => cacheClear(),
     QR_LOCAL_STATUS: () => localStatus(),
+    QR_WARM: () => localWarm(),
   };
   if (msg && msg.target === "offscreen") return; // meant for the offscreen page
   const h = handlers[msg && msg.type];
@@ -49,6 +50,7 @@ function cacheKeyInput({ text, choices, math, kind }, model) {
 // and a queue so background preparing runs one at a time across all tabs.
 const inflight = new Map();
 let prefetchLock = Promise.resolve();
+let currentPrefetch = null; // { jobId, key } of the background rewrite running right now
 
 async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, prefetch }) {
   const reading = kind === "reading";
@@ -86,13 +88,16 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   const schema = QRLocal.SCHEMAS[reading ? "reading" : "question"];
 
   // One attempt = first answer, then one chance for the model to fix its own mistakes.
-  async function attempt(which) {
-    const call = (msgs) => (which === "local" ? localCall(msgs, system, schema) : claudeCall(apiKey, claudeModel, msgs, system));
+  // On-device: one pass only (a second "fix it" pass doubled the wait); mistakes are repaired instantly instead.
+  async function attempt(which, jobId) {
+    const started = Date.now();
+    const call = (msgs) => (which === "local" ? localCall(msgs, system, schema, jobId) : claudeCall(apiKey, claudeModel, msgs, system));
     const messages = [{ role: "user", content: firstMessage }];
     const raw = await call(messages);
     let structured = parseStructured(raw);
     let problems = check(structured);
-    if (problems.length) {
+    console.log(`[Reformatter] ${which} ${kind || "question"} rewrite: ${((Date.now() - started) / 1000).toFixed(1)}s, ${problems.length} problem(s)`);
+    if (problems.length && which !== "local") {
       try {
         const raw2 = await call([...messages, { role: "assistant", content: raw }, { role: "user", content: buildFixMessage(problems) }]);
         const second = parseStructured(raw2);
@@ -117,9 +122,13 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   if (prefetch) {
     if ((provider || "local") !== "local") return { skipped: true };
     const job = prefetchLock.then(() => {
+      const jobId = "p" + Date.now() + Math.random();
       const p = (async () => {
         if ((await localStatus()) !== "available") return { skipped: true };
-        return finish(await attempt("local"));
+        currentPrefetch = { jobId, key: localKey };
+        try { return finish(await attempt("local", jobId)); }
+        catch (e) { if (/abort/i.test(String(e && e.message))) return { aborted: true }; throw e; }
+        finally { if (currentPrefetch && currentPrefetch.jobId === jobId) currentPrefetch = null; }
       })();
       inflight.set(localKey, p);
       return p.finally(() => inflight.delete(localKey));
@@ -130,6 +139,11 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
 
   let r;
   if ((provider || "local") === "local") {
+    // A click goes first: pause whatever is being prepared in the background (it is re-queued).
+    if (currentPrefetch && currentPrefetch.key !== localKey) {
+      viaOffscreen("QR_LOCAL_ABORT", { jobId: currentPrefetch.jobId }).catch(() => {});
+      currentPrefetch = null;
+    }
     const status = await localStatus();
     if (status === "available") {
       try {
@@ -181,16 +195,24 @@ async function ensureOffscreen() {
 async function viaOffscreen(type, payload) {
   await ensureOffscreen();
   const r = await chrome.runtime.sendMessage({ target: "offscreen", type, payload });
-  if (!r || !r.ok) throw new Error(r ? r.error : "The on-device model didn't respond.");
+  if (!r || !r.ok) throw new Error(r ? (r.aborted ? "aborted: " : "") + r.error : "The on-device model didn't respond.");
   return r.result;
 }
-async function localCall(messages, system, schema) {
-  return QRLocal.has() ? QRLocal.run({ system, messages, schema }) : viaOffscreen("QR_LOCAL_RUN", { system, messages, schema });
+// Always run in the offscreen page: it stays open, so the model stays loaded and warm.
+async function localCall(messages, system, schema, jobId) {
+  return viaOffscreen("QR_LOCAL_RUN", { system, messages, schema, jobId });
 }
 async function localStatus() {
-  try { return QRLocal.has() ? await QRLocal.availability() : await viaOffscreen("QR_LOCAL_STATUS"); }
+  try { return await viaOffscreen("QR_LOCAL_STATUS"); }
   catch (_) { return "unavailable"; }
 }
+async function localWarm() {
+  const { provider } = await chrome.storage.local.get("provider");
+  if ((provider || "local") !== "local") return false;
+  return viaOffscreen("QR_LOCAL_WARM", { systems: [READING_PROMPT, SYSTEM_PROMPT] }).catch(() => false);
+}
+chrome.runtime.onStartup.addListener(() => { localWarm(); });
+chrome.runtime.onInstalled.addListener(() => { localWarm(); });
 
 function parseStructured(raw) {
   const parsed = JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1));

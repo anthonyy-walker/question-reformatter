@@ -455,6 +455,7 @@
   const readingPanels = new Map(); // element -> panel
 
   function startSuggestions() {
+    send({ type: "QR_WARM" }); // load the free model now, so the first rewrite isn't slow
     refreshSuggestions();
     new MutationObserver((muts) => {
       if (muts.every((m) => m.target.closest && m.target.closest("[data-qr]"))) return;
@@ -658,6 +659,7 @@
           else btn.title = "Rewrite this paragraph in plain language";
         }
         if (resp && resp.ok && resp.result.skipped) { prefetchQueue.clear(); break; } // free model not available here
+        if (resp && resp.ok && resp.result.aborted) { prefetched--; prefetchQueue.add(best); await new Promise((r) => setTimeout(r, 500)); } // a click went first; try again after
       }
     } finally {
       prefetching = false;
