@@ -22,7 +22,7 @@
     return el;
   }
 
-  const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [] };
+  const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [], provider: "local" };
   const FIELDS = Object.keys(DEFAULTS);
 
   function load() {
@@ -42,6 +42,44 @@
       const head = h("div.qr-set-head", {},
         h("h1", { text: "Settings" }),
         opts.onClose && h("button.qr-btn.qr-btn-icon", { "aria-label": "Close settings", onclick: opts.onClose }, "✕"));
+
+      // Which AI does the rewriting
+      const providerOn = draft.provider || "local";
+      const localStatus = h("span.qr-help", { role: "status" }, "Checking this computer…");
+      const setupRow = h("div.qr-saved-row", {});
+      const provider = h("div.qr-fieldset", { role: "radiogroup", "aria-label": "AI" },
+        h("div.qr-legend", { text: "AI" }),
+        h("div.qr-mode-grid", {}, [
+          ["local", "Free — on this computer", "Chrome's built-in model (Gemini Nano). No cost, works offline, text never leaves your computer. If it struggles and a Claude key is set, Claude takes over for that one."],
+          ["claude", "Claude", "Best quality. Uses your API key; about $0.002 per rewrite."],
+        ].map(([k, name, desc]) => {
+          const on = providerOn === k;
+          return h(`button.qr-btn.qr-mode${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.provider = k; render(); } },
+            h("span.qr-mode-name", {}, h("span.qr-dot", { "aria-hidden": "true" }, on ? "✓" : ""), name),
+            h("span.qr-mode-desc", { text: desc }));
+        })),
+        localStatus, setupRow);
+      chrome.runtime.sendMessage({ type: "QR_LOCAL_STATUS" }, (r) => {
+        const st = r && r.ok ? r.result : "unavailable";
+        localStatus.textContent = {
+          available: "✓ On-device model is ready on this computer.",
+          downloadable: "On-device model isn't downloaded yet (one time, a few GB).",
+          downloading: "On-device model is downloading…",
+          unavailable: "This computer can't run the on-device model. Claude will be used.",
+          missing: "This Chrome doesn't have the built-in model. Update Chrome, or Claude will be used.",
+        }[st] || st;
+        if (st === "downloadable" || st === "downloading") {
+          const canHere = location.protocol === "chrome-extension:" && globalThis.QRLocal && QRLocal.has();
+          const btn = h("button.qr-btn.qr-btn-primary", { onclick: () => {
+            if (!canHere) { chrome.runtime.sendMessage({ type: "QR_OPEN_OPTIONS" }); return; }
+            btn.disabled = true; btn.textContent = "Downloading… 0%";
+            QRLocal.download((p) => { btn.textContent = `Downloading… ${Math.round(p * 100)}%`; })
+              .then(() => { localStatus.textContent = "✓ On-device model is ready on this computer."; btn.remove(); })
+              .catch((e) => { btn.disabled = false; btn.textContent = "Try again"; localStatus.textContent = "Download failed: " + e.message; });
+          } }, canHere ? "Set up the on-device model" : "Open setup page");
+          setupRow.append(btn);
+        }
+      });
 
       // Suggestions on websites + sites where it's turned off
       const suggestOn = draft.suggest !== false;
@@ -77,13 +115,13 @@
         }));
 
       const fields = h("div.qr-two", {},
-        h("label.qr-field", {}, h("span.qr-legend", { text: "API key" }), key, h("span.qr-help", { text: "Required. Stored on this device only. Sent only to api.anthropic.com." })),
+        h("label.qr-field", {}, h("span.qr-legend", { text: "API key" }), key, h("span.qr-help", { text: "Optional with the free model (used as backup). Stored on this device only. Sent only to api.anthropic.com." })),
         h("label.qr-field", {}, h("span.qr-legend", { text: "Model" }), model, h("span.qr-help", { text: "Haiku is plenty for most text." })));
 
       // Saved AI results
       const savedCount = h("span", { text: "…" });
-      const clearBtn = h("button.qr-btn", { onclick: () => chrome.runtime.sendMessage({ type: "QR_CACHE_CLEAR" }, () => { savedCount.textContent = "0 questions"; }) }, "Clear saved results");
-      chrome.runtime.sendMessage({ type: "QR_CACHE_STATS" }, (r) => { savedCount.textContent = r && r.ok ? `${r.result.count} question${r.result.count === 1 ? "" : "s"}` : "unknown"; });
+      const clearBtn = h("button.qr-btn", { onclick: () => chrome.runtime.sendMessage({ type: "QR_CACHE_CLEAR" }, () => { savedCount.textContent = "0 results"; }) }, "Clear saved results");
+      chrome.runtime.sendMessage({ type: "QR_CACHE_STATS" }, (r) => { savedCount.textContent = r && r.ok ? `${r.result.count} result${r.result.count === 1 ? "" : "s"}` : "unknown"; });
       const saved = h("div.qr-fieldset", {},
         h("div.qr-legend", { text: "Saved AI results" }),
         h("div.qr-saved-row", {}, h("span", {}, "Saved on this device: ", savedCount), clearBtn),
@@ -118,7 +156,7 @@
         chrome.storage.local.set(draft, () => { status.textContent = "✓ Saved"; opts.onSaved && opts.onSaved({ ...draft }); });
       } }, "Save");
 
-      card.append(head, suggest,
+      card.append(head, provider, suggest,
         seg("Text size", "textSize", [["normal", "Normal", 16], ["larger", "Larger", 20], ["largest", "Largest", 24]]),
         seg("Theme", "theme", [["light", "Light"], ["dark", "Dark"]]),
         fields, saved, instr,

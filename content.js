@@ -615,7 +615,7 @@
       panel.append(header(), h("div.qr-warn", { role: "status" },
         h("span.qr-info-icon", { "aria-hidden": "true" }, "i"),
         h("div", { style: { display: "flex", flexDirection: "column", gap: "8px", minWidth: 0 } },
-          h("p.qr-warn-title", {}, "Couldn't reach the AI"),
+          h("p.qr-warn-title", {}, "Couldn't simplify this yet"),
           h("p.qr-warn-text", {}, msg),
           h("div", {}, h("button.qr-btn", { onclick: retry }, "Try again")))));
     }

@@ -1,10 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Question Reformatter",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Rewrites dense text in plain, simple language \u2014 Gradescope questions and long paragraphs on any website. Never solves or hints.",
   "permissions": [
-    "storage"
+    "storage",
+    "offscreen"
   ],
   "host_permissions": [
     "<all_urls>"

@@ -10,7 +10,9 @@ A Chrome extension that rewrites dense text in plain, simple language — for st
 1. Clone or unzip this folder somewhere you'll keep it.
 2. Go to `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** → pick the `question-reformatter` folder.
-4. Open the settings (⚙ on the toolbar, or the extension's icon) and paste your Anthropic API key.
+4. Open the settings (⚙ on the toolbar, or the extension's icon):
+   - **Free — on this computer** (default): click **Set up the on-device model** once. Chrome downloads its built-in model (Gemini Nano, a few GB). After that every rewrite is free, offline, and private.
+   - **Claude** (optional): paste an Anthropic API key for best quality. With the free model selected, Claude is only used as a backup.
 
 ### Updating without losing your key
 Don't remove the extension. Replace the files in the same folder (`git pull`), then click ↻ on the extension in `chrome://extensions`.
@@ -23,6 +25,11 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 - **Gradescope**
   - **Reformat questions** finds every question; **Pick a question** if auto-find misses one.
   - Click a simplified answer choice → confirm → it selects that answer on the page.
+
+## Which AI does the work
+- **Free, on this computer:** Chrome's built-in model through the Prompt API. Needs macOS 13+ / Windows 10+, 22 GB free disk, and 16 GB RAM or a GPU with 4 GB+. Check `chrome://on-device-internals`.
+- **Automatic backup:** if the built-in model can't run, or its answer still has more than 2 problems after it fixes itself, Claude takes over for that one rewrite — only if a Claude key is set.
+- **Claude:** best quality; about $0.002 per rewrite with Haiku.
 
 ## How the AI is kept honest
 - Instructions are in `prompt.js` (one set for questions, one for everything else). The settings page shows them word for word.
@@ -51,5 +58,6 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 - `prompt.js` — the AI's instructions
 - `formatter.js` — checks and automatic repair
 - `math.js` — reads math from the page, converts it to readable/spoken form
-- `background.js` — AI call and saved results (keeps the API key off the page)
+- `background.js` — picks the AI, runs the checks, saves results (keeps the API key off the page)
+- `local-ai.js`, `offscreen.html` / `offscreen.js` — Chrome's built-in on-device model
 - `settings-ui.js`, `options.html` / `options.js` — settings
