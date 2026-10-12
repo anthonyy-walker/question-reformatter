@@ -52,7 +52,7 @@ const inflight = new Map();
 let prefetchLock = Promise.resolve();
 let currentPrefetch = null; // { jobId, key } of the background rewrite running right now
 
-async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, prefetch }) {
+async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, prefetch, useClaude }) {
   const reading = kind === "reading";
   choices = reading ? [] : choices || [];
   const { apiKey, model: chosen, provider } = await chrome.storage.local.get(["apiKey", "model", "provider"]);
@@ -61,7 +61,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
 
   // Saved result from either provider → free.
   if (!forceFresh) {
-    for (const m of [LOCAL_MODEL, claudeModel]) {
+    for (const m of useClaude ? [claudeModel] : [LOCAL_MODEL, claudeModel]) {
       const key = await keyFor(m);
       const hit = (await chrome.storage.local.get(key))[key];
       if (hit) {
@@ -74,7 +74,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   if (cacheOnly) return { miss: true };
 
   const localKey = await keyFor(LOCAL_MODEL);
-  if (inflight.has(localKey)) {
+  if (!useClaude && inflight.has(localKey)) {
     try {
       const done = await inflight.get(localKey);
       if (done && done.structured) return { ...done, cached: true };
@@ -84,6 +84,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   const mathText = Object.fromEntries((math || []).map((m) => [m.token, m.text]));
   const check = (s) => QRFormatter.checkSimple(text, choices, s, mathText, { reading });
   const system = reading ? READING_PROMPT : SYSTEM_PROMPT;
+  const localSystem = reading ? LOCAL_READING_PROMPT : SYSTEM_PROMPT;
   const firstMessage = reading ? buildReadingMessage(text, math) : buildUserMessage(text, choices, math);
   const schema = QRLocal.SCHEMAS[reading ? "reading" : "question"];
 
@@ -91,7 +92,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   // On-device: one pass only (a second "fix it" pass doubled the wait); mistakes are repaired instantly instead.
   async function attempt(which, jobId) {
     const started = Date.now();
-    const call = (msgs) => (which === "local" ? localCall(msgs, system, schema, jobId) : claudeCall(apiKey, claudeModel, msgs, system));
+    const call = (msgs) => (which === "local" ? localCall(msgs, localSystem, schema, jobId) : claudeCall(apiKey, claudeModel, msgs, system));
     const messages = [{ role: "user", content: firstMessage }];
     const raw = await call(messages);
     let structured = parseStructured(raw);
@@ -138,7 +139,10 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   }
 
   let r;
-  if ((provider || "local") === "local") {
+  if (useClaude) {
+    if (!apiKey) throw new Error("No Claude API key set. Add one in Settings to use Claude.");
+    r = await attempt("claude");
+  } else if ((provider || "local") === "local") {
     // A click goes first: pause whatever is being prepared in the background (it is re-queued).
     if (currentPrefetch && currentPrefetch.key !== localKey) {
       viaOffscreen("QR_LOCAL_ABORT", { jobId: currentPrefetch.jobId }).catch(() => {});
@@ -209,7 +213,7 @@ async function localStatus() {
 async function localWarm() {
   const { provider } = await chrome.storage.local.get("provider");
   if ((provider || "local") !== "local") return false;
-  return viaOffscreen("QR_LOCAL_WARM", { systems: [READING_PROMPT, SYSTEM_PROMPT] }).catch(() => false);
+  return viaOffscreen("QR_LOCAL_WARM", { systems: [LOCAL_READING_PROMPT, SYSTEM_PROMPT] }).catch(() => false);
 }
 chrome.runtime.onStartup.addListener(() => { localWarm(); });
 chrome.runtime.onInstalled.addListener(() => { localWarm(); });

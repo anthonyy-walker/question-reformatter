@@ -32,6 +32,8 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 - **Free, on this computer:** Chrome's built-in model through the Prompt API. Needs macOS 13+ / Windows 10+, 22 GB free disk, and 16 GB RAM or a GPU with 4 GB+. Check `chrome://on-device-internals`.
 - **Automatic backup:** if the built-in model can't run, or its answer still has more than 2 problems after it fixes itself, Claude takes over for that one rewrite — only if a Claude key is set.
 - **Claude:** best quality; about $0.002 per rewrite with Haiku.
+- **✨ Better with Claude:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
+- The free model gets extra style rules and a worked example (2–4 topics, no repeated facts, abbreviations spelled out), because small models copy examples closely.
 
 ## How the AI is kept honest
 - Instructions are in `prompt.js` (one set for questions, one for everything else). The settings page shows them word for word.

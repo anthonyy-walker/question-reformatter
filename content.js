@@ -427,11 +427,11 @@
   }
 
   // Sends text to the AI (or the saved copy) and fills the panel.
-  function runAI(ctrl, read, { kind, restoring, onDone, onMiss }) {
+  function runAI(ctrl, read, { kind, restoring, onDone, onMiss, useClaude }) {
     ctrl.loading();
     working++; renderToolbar();
     chrome.runtime.sendMessage({
-      type: "QR_AI_REFORMAT", kind, text: read.text, choices: read.choices,
+      type: "QR_AI_REFORMAT", kind, useClaude: !!useClaude, text: read.text, choices: read.choices,
       math: read.math.map(({ token, text }) => ({ token, text })),
       cacheOnly: !!restoring, // coming back to a page never spends tokens on its own
     }, (resp) => {
@@ -442,7 +442,11 @@
         return;
       }
       if (resp.result.miss) { onMiss && onMiss(); return; }
-      ctrl.show(resp.result.structured, {});
+      const via = resp.result.via;
+      ctrl.show(resp.result.structured, {
+        // Free result + a Claude key saved → offer a one-click better version (pay only when you want it).
+        upgrade: via === "local" && settings.apiKey ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
+      });
       onDone && onDone();
     });
   }
@@ -725,6 +729,7 @@
     function header() {
       return h("div.qr-header", {},
         h("div.qr-header-actions", {},
+          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "✨ Better with Claude"),
           data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; setOriginalHidden(!showOriginal); draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
           h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, "✕")));
     }

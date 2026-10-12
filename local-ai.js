@@ -74,7 +74,10 @@
   const sections = { type: "array", maxItems: 4, items: { type: "object", properties: { heading: { type: "string" }, points: { type: "array", items: point, maxItems: 5 } }, required: ["heading", "points"] } };
   const SCHEMAS = {
     question: { type: "object", properties: { sections, question: { type: "array", items: { type: "string" } }, choices_intro: { type: "string" }, choices: { type: "array", items: { type: "string" } } }, required: ["sections", "question", "choices"] },
-    reading: { type: "object", properties: { summary: { type: "string" }, sections }, required: ["summary", "sections"] },
+    reading: { type: "object", properties: { summary: { type: "string" }, sections: {
+      type: "array", minItems: 2, maxItems: 4,
+      items: { type: "object", properties: { heading: { type: "string" }, points: { type: "array", items: point, minItems: 1, maxItems: 3 } }, required: ["heading", "points"] },
+    } }, required: ["summary", "sections"] },
   };
 
   root.QRLocal = { has, availability, download, warm, run, SCHEMAS };
