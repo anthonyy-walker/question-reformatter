@@ -71,24 +71,24 @@
     toolbarHost.textContent = "";
 
     if (collapsed) {
-      toolbarHost.append(h("button.qr-tab", { "aria-label": "Open Reformatter toolbar", onclick: () => { collapsed = false; renderToolbar(); } },
-        icon("left", 16), h("span.qr-tab-word", {}, "Reformatter")));
+      toolbarHost.append(h("button.qr-tab", { "aria-label": "Open Dyslexia Reading Aid toolbar", onclick: () => { collapsed = false; renderToolbar(); } },
+        icon("left", 16), h("span.qr-tab-word", {}, "Reading Aid")));
       return;
     }
     const busy = working > 0;
     const head = h("div.qr-tb-head", {},
-      h("span.qr-tb-title", {}, "Reformatter"),
+      h("span.qr-tb-title", {}, "Dyslexia Reading Aid"),
       h("button.qr-btn", { "aria-label": "Settings", onclick: openSettings }, icon("gear", 19)),
       h("button.qr-btn", { "aria-label": "Collapse toolbar", onclick: () => { collapsed = true; renderToolbar(); } }, icon("right", 18)));
 
     if (QUESTION_SITE) {
-      toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Question Reformatter" }, head,
+      toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Dyslexia Reading Aid" }, head,
         h(`button.qr-btn${busy ? ".qr-working" : ".qr-btn-primary"}`, { disabled: busy, onclick: reformatAll }, busy ? "Working…" : "Reformat questions"),
         h(`button.qr-btn${picking ? ".qr-pick-on" : ""}`, { disabled: busy, "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick a question"),
         busy && h("p.qr-tb-status", { role: "status" }, "Working on it…")));
       return;
     }
-    toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Reformatter" }, head,
+    toolbarHost.append(h("div.qr-toolbar", { role: "toolbar", "aria-label": "Dyslexia Reading Aid" }, head,
       h(`button.qr-btn${picking ? ".qr-pick-on" : ".qr-btn-primary"}`, { "aria-pressed": String(picking), onclick: togglePicking }, picking ? "Cancel picking" : "Pick text to reformat"),
       h("button.qr-btn", { "aria-pressed": String(!siteOff), onclick: toggleSite }, siteOff ? "Turn on for this site" : "Turn off for this site"),
       h("p.qr-tb-status", {}, siteOff ? "Off on " + HOST : `${suggestCount} paragraph${suggestCount === 1 ? "" : "s"} suggested here`)));

@@ -62,7 +62,7 @@
     const s = await load();
     const draft = { ...s };
 
-    const card = h("div.qr-settings", { role: "dialog", "aria-label": "Reformatter settings" });
+    const card = h("div.qr-settings", { role: "dialog", "aria-label": "Dyslexia Reading Aid settings" });
 
     function render() {
       card.textContent = "";

@@ -1,4 +1,4 @@
-# Question Reformatter
+# Dyslexia Reading Aid
 
 A Chrome extension that rewrites dense text in plain, simple language — for students with dyslexia, autism, ADHD, or anyone who loses the point inside a long paragraph.
 
@@ -10,7 +10,7 @@ A Chrome extension that rewrites dense text in plain, simple language — for st
 ## Install (Chrome)
 1. Clone or unzip this folder somewhere you'll keep it.
 2. Go to `chrome://extensions` and turn on **Developer mode** (top right).
-3. Click **Load unpacked** → pick the `question-reformatter` folder.
+3. Click **Load unpacked** → pick the `question-reformatter` folder (the folder keeps its old name).
 4. Open the settings (the gear on the toolbar, or the extension's icon):
    - **Free — on this computer** (default): click **Set up the on-device model** once. Chrome downloads its built-in model (Gemini Nano, a few GB). After that every rewrite is free, offline, and private.
    - **Claude** (optional): paste an Anthropic API key for best quality. With the free model selected, Claude is only used as a backup.
@@ -24,7 +24,7 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
   - **Ready ahead of time (free model):** suggested paragraphs are reformatted in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
   - **How paragraphs are found:** every visible piece of text is grouped by the box it sits in (so text split across links, bold, spans or line breaks still counts), then scored: long, or medium-length and hard to read (reading grade 12+, long sentences, many long words), or short but very hard (grade 16+). Works inside embedded frames and web components too. Menus, footers, forms, buttons and code are skipped.
   - Select text (12+ words) → Reformat appears next to it.
-  - The small **Reformatter** tab on the right edge opens the toolbar: **Pick text to reformat**, **Turn off for this site**, settings.
+  - The small **Reading Aid** tab on the right edge opens the toolbar: **Pick text to reformat**, **Turn off for this site**, settings.
 - **Gradescope**
   - **Reformat questions** finds every question; **Pick a question** if auto-find misses one.
   - Click a reformatted answer choice → confirm → it selects that answer on the page.

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Question Reformatter",
-  "version": "0.8.1",
+  "name": "Dyslexia Reading Aid",
+  "version": "0.9.0",
   "description": "Rewrites dense text in plain, simple language \u2014 Gradescope questions and long paragraphs on any website. Never solves or hints.",
   "permissions": [
     "storage",
@@ -46,6 +46,6 @@
   ],
   "options_page": "options.html",
   "action": {
-    "default_title": "Reformatter settings"
+    "default_title": "Dyslexia Reading Aid settings"
   }
 }

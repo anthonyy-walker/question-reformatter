@@ -97,7 +97,7 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
     const raw = await call(messages);
     let structured = parseStructured(raw);
     let problems = check(structured);
-    console.log(`[Reformatter] ${which} ${kind || "question"} rewrite: ${((Date.now() - started) / 1000).toFixed(1)}s, ${problems.length} problem(s)`);
+    console.log(`[Reading Aid] ${which} ${kind || "question"} rewrite: ${((Date.now() - started) / 1000).toFixed(1)}s, ${problems.length} problem(s)`);
     if (problems.length && which !== "local") {
       try {
         const raw2 = await call([...messages, { role: "assistant", content: raw }, { role: "user", content: buildFixMessage(problems) }]);
