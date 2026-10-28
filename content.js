@@ -436,7 +436,7 @@
       const via = resp.result.via;
       ctrl.show(F.tidyLines(resp.result.structured), {
         // Free result + a Claude key saved → offer a one-click better version (pay only when you want it).
-        upgrade: via === "local" && (settings.apiKey || (settings.serverUrl && settings.serverCode)) ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
+        upgrade: via === "local" && settings.serverCode ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
       });
       onDone && onDone();
     });
@@ -720,7 +720,7 @@
     function header() {
       return h("div.qr-header", {},
         h("div.qr-header-actions", {},
-          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "Reword"),
+          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one on your server with Claude", onclick: meta.upgrade }, "Reword"),
           data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; setOriginalHidden(!showOriginal); draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
           h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, icon("close", 17))));
     }

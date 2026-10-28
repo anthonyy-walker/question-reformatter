@@ -5,7 +5,6 @@
 
 importScripts("prompt.js", "formatter.js", "local-ai.js");
 
-const DEFAULT_MODEL = "claude-haiku-4-5-20251001";
 const LOCAL_MODEL = "chrome-built-in";
 const HEAVY_REPAIR = 2; // more problems than this after the self-fix → ask Claude instead (if a key is set)
 const CACHE_PREFIX = "c:";
@@ -56,16 +55,20 @@ let currentPrefetch = null; // { jobId, key } of the background rewrite running 
 async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, prefetch, useClaude, site, pageTitle }) {
   const reading = kind === "reading";
   choices = reading ? [] : choices || [];
-  const { apiKey: ownKey, model: chosen, provider, serverUrl, serverCode } = await chrome.storage.local.get(["apiKey", "model", "provider", "serverUrl", "serverCode"]);
-  // Your own server, when set up, does every Claude rewrite (it checks, repairs and logs them).
-  const remote = !!(serverUrl && serverCode);
-  const apiKey = remote ? "server" : ownKey; // "is Claude available?" below
-  const claudeModel = remote ? SERVER_MODEL : chosen || DEFAULT_MODEL;
+  const st = await chrome.storage.local.get(["provider", "serverUrl", "serverCode"]);
+  // Only two ways to rewrite: the free on-device model, or your own server (which holds the Claude key,
+  // runs the checks and logs every rewrite). Nothing talks to Claude directly from this computer.
+  const provider = st.provider === "local" || !st.provider ? "local" : "server";
+  const serverUrl = st.serverUrl || DEFAULT_SERVER;
+  const serverCode = st.serverCode;
+  const remote = !!serverCode;
+  const apiKey = remote ? "server" : null; // "is the server available?" below
+  const claudeModel = SERVER_MODEL;
   const keyFor = async (m) => CACHE_PREFIX + (await sha256(cacheKeyInput({ text, choices, math, kind }, m)));
 
   // Saved result from either provider → free.
   if (!forceFresh) {
-    for (const m of useClaude ? [claudeModel] : [LOCAL_MODEL, claudeModel, SERVER_MODEL, chosen || DEFAULT_MODEL].filter((x, i, a) => a.indexOf(x) === i)) {
+    for (const m of useClaude ? [claudeModel] : [LOCAL_MODEL, SERVER_MODEL]) {
       const key = await keyFor(m);
       const hit = (await chrome.storage.local.get(key))[key];
       if (hit) {
@@ -96,12 +99,13 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
   // On-device: one pass only (a second "fix it" pass doubled the wait); mistakes are repaired instantly instead.
   async function attempt(which, jobId) {
     const started = Date.now();
-    if (which !== "local" && remote) {
+    if (which !== "local") {
+      if (!remote) throw new Error("Connect your server first: Settings → My server → paste your connection code.");
       const r = await serverCall(serverUrl, serverCode, { text, choices, math, kind: reading ? "reading" : "question", site, pageTitle, forceFresh });
       console.log(`[Reading Aid] server ${kind || "question"} rewrite: ${((Date.now() - started) / 1000).toFixed(1)}s${r.cached ? " (saved on server)" : ""}`);
       return { structured: r.structured, problems: [], model: SERVER_MODEL, via: "claude" };
     }
-    const call = (msgs) => (which === "local" ? localCall(msgs, localSystem, schema, jobId) : claudeCall(apiKey, claudeModel, msgs, system));
+    const call = (msgs) => localCall(msgs, localSystem, schema, jobId);
     const messages = [{ role: "user", content: firstMessage }];
     const raw = await call(messages);
     let structured = parseStructured(raw);
@@ -149,9 +153,8 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
 
   let r;
   if (useClaude) {
-    if (!apiKey) throw new Error("No Claude API key set. Add one in Settings to use Claude.");
     r = await attempt("claude");
-  } else if (provider === "server" && remote) {
+  } else if (provider === "server") {
     // Server first; if it can't be reached (offline, paused), the free on-device model.
     try { r = await attempt("claude"); }
     catch (e) {
@@ -178,13 +181,8 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
     } else {
       throw new Error(status === "downloadable" || status === "downloading"
         ? "The free on-device model isn't downloaded yet. Open Settings → Set up the on-device model."
-        : "The free on-device model can't run in this Chrome. Add a Claude API key in Settings.");
+        : "The free on-device model can't run in this Chrome. Connect your server in Settings → My server.");
     }
-  } else {
-    if (!apiKey) throw new Error(provider === "server"
-      ? "Add your server address and connection code in Settings → My server."
-      : "No Claude API key set. Open Settings to add one, or switch to the free on-device model.");
-    r = await attempt("claude");
   }
 
   return finish(r);
@@ -193,6 +191,15 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
 // ---------- providers ----------
 
 const SERVER_MODEL = "my-server";
+const DEFAULT_SERVER = "https://server-production-0b34.up.railway.app";
+
+// No Claude key is kept on this computer any more (the server holds it). Remove an old one.
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.storage.local.get(["provider"], (s) => {
+    chrome.storage.local.remove(["apiKey", "model"]);
+    if (s.provider === "claude") chrome.storage.local.set({ provider: "server" });
+  });
+});
 
 async function serverFetch(url, code, path, body) {
   if (!/^https:\/\/|^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?/.test(url || "")) throw new Error("The server address must start with https://");
@@ -212,21 +219,6 @@ async function serverFetch(url, code, path, body) {
 const serverCall = (url, code, body) => serverFetch(url, code, "/api/ext/reformat", body);
 const serverPing = (url, code) => serverFetch(url, code, "/api/ext/ping");
 
-async function claudeCall(apiKey, model, messages, system) {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "anthropic-dangerous-direct-browser-access": "true",
-    },
-    body: JSON.stringify({ model, max_tokens: 2000, temperature: 0, system, messages }),
-  });
-  if (!res.ok) throw new Error(`Claude API error ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  const data = await res.json();
-  return (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("");
-}
 
 // The on-device model runs here if this service worker has it, otherwise in a hidden offscreen page.
 async function ensureOffscreen() {

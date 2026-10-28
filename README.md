@@ -13,7 +13,7 @@ A Chrome extension that rewrites dense text in plain, simple language — for st
 3. Click **Load unpacked** → pick the `question-reformatter` folder (the folder keeps its old name).
 4. Open the settings (the gear on the toolbar, or the extension's icon):
    - **Free — on this computer** (default): click **Set up the on-device model** once. Chrome downloads its built-in model (Gemini Nano, a few GB). After that every rewrite is free, offline, and private.
-   - **Claude** (optional): paste an Anthropic API key for best quality. With the free model selected, Claude is only used as a backup.
+   - **My server** (optional): paste the connection code from your dashboard (Connect extension). Best quality, and every rewrite is logged. With the free model selected, the server is only used as a backup.
 
 ### Updating without losing your key
 Don't remove the extension. Replace the files in the same folder (`git pull`), then click the reload icon on the extension in `chrome://extensions`.
@@ -37,9 +37,9 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 
 ## Which AI does the work
 - **Free, on this computer:** Chrome's built-in model through the Prompt API. Needs macOS 13+ / Windows 10+, 22 GB free disk, and 16 GB RAM or a GPU with 4 GB+. Check `chrome://on-device-internals`.
-- **Automatic backup:** if the built-in model can't run, or its answer still has more than 2 problems after it fixes itself, Claude takes over for that one rewrite — only if a Claude key is set.
-- **Claude:** best quality; about $0.002 per rewrite with Haiku.
-- **Reword:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
+- **My server:** Claude through your own server (see below). Best quality; about $0.002 per rewrite with Haiku. The Claude key lives only on the server, never on this computer.
+- **Automatic backup:** if the built-in model can't run, or its answer has more than 2 problems, your server takes over for that one rewrite (if connected).
+- **Reword:** on any free result, one click rewrites just that paragraph on your server.
 - The free model gets extra style rules and a worked example (2–4 topics, no repeated facts, abbreviations spelled out), because small models copy examples closely.
 
 ## How the AI is kept honest
@@ -84,6 +84,6 @@ The `server/` folder is a small server with a dashboard, made for Railway. It is
 - `prompt.js` — the AI's instructions
 - `formatter.js` — checks and automatic repair
 - `math.js` — reads math from the page, converts it to readable/spoken form
-- `background.js` — picks the AI, runs the checks, saves results (keeps the API key off the page)
+- `background.js` — picks the AI, runs the checks, saves results (talks to the on-device model or your server)
 - `local-ai.js`, `offscreen.html` / `offscreen.js` — Chrome's built-in on-device model
 - `settings-ui.js`, `options.html` / `options.js` — settings
