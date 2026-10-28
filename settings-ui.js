@@ -119,14 +119,14 @@
             const on = suggestOn === v;
             return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.suggest = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "When on, long or dense paragraphs get a small Reformat button." }),
+        h("span.qr-help", { text: "When on, long or dense paragraphs get a small Dyslexia Reading Aid button." }),
         h("div.qr-legend", { text: "Get rewrites ready ahead of time", style: { marginTop: "10px" } }),
         h("div.qr-seg", { role: "radiogroup", "aria-label": "Get rewrites ready ahead of time" },
           [[true, "On"], [false, "Off"]].map(([v, name]) => {
             const on = (draft.prefetch !== false) === v;
             return h(`button.qr-btn${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.prefetch = v; render(); } }, on ? icon("check", 15) : null, name);
           })),
-        h("span.qr-help", { text: "Free model only. Suggested paragraphs are reformatted in the background, closest to where you're reading first, so Reformat opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
+        h("span.qr-help", { text: "Free model only. Suggested paragraphs are reformatted in the background, closest to where you're reading first, so the Dyslexia Reading Aid button opens instantly (the button fills in when it's ready). Text stays on this computer. Claude is never used for this." }),
         offList.length
           ? h("div.qr-saved-row", {}, h("span", {}, "Turned off on: "), offList.map((host) =>
               h("button.qr-btn", { "aria-label": "Turn back on for " + host, onclick: () => { draft.offSites = offList.filter((x) => x !== host); render(); } }, host, icon("close", 14))))

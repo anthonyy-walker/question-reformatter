@@ -2,7 +2,7 @@
 
 A Chrome extension that rewrites dense text in plain, simple language — for students with dyslexia, autism, ADHD, or anyone who loses the point inside a long paragraph.
 
-- **On any website:** long or dense paragraphs get a small **Reformat** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers Reformat.
+- **On any website:** long or dense paragraphs get a small **Dyslexia Reading Aid** button. Click it and the paragraph is swapped for a plain-language version: the key point first, then short points under clear headings. Selecting any text also offers the same button.
 - **On Gradescope:** questions are rewritten in plain language too, with stricter rules — it never solves, hints, rules out choices, or reorders answers. You still answer on the original question.
 - **Show original wording** brings back the exact original at any time.
 - **Short lines:** every bullet fits on one line (about 10 words), with at most 8 lines per section. Anything longer is split at a natural break into another bullet, and big sections continue under "(cont.)" — nothing is cut off.
@@ -20,10 +20,10 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 
 ## Use
 - **Any website**
-  - Reformat buttons appear on hard-to-read paragraphs.
+  - Dyslexia Reading Aid buttons appear on hard-to-read paragraphs.
   - **Ready ahead of time (free model):** suggested paragraphs are reformatted in the background, closest to where you're reading first. The button fills in when it's ready, and clicking it opens instantly. This never uses Claude.
   - **How paragraphs are found:** every visible piece of text is grouped by the box it sits in (so text split across links, bold, spans or line breaks still counts), then scored: long, or medium-length and hard to read (reading grade 12+, long sentences, many long words), or short but very hard (grade 16+). Works inside embedded frames and web components too. Menus, footers, forms, buttons and code are skipped.
-  - Select text (12+ words) → Reformat appears next to it.
+  - Select text (12+ words) → the Dyslexia Reading Aid button appears next to it.
   - The small **Reading Aid** tab on the right edge opens the toolbar: **Pick text to reformat**, **Turn off for this site**, settings.
 - **Gradescope**
   - **Reformat questions** finds every question; **Pick a question** if auto-find misses one.
@@ -39,7 +39,7 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 - **Free, on this computer:** Chrome's built-in model through the Prompt API. Needs macOS 13+ / Windows 10+, 22 GB free disk, and 16 GB RAM or a GPU with 4 GB+. Check `chrome://on-device-internals`.
 - **Automatic backup:** if the built-in model can't run, or its answer still has more than 2 problems after it fixes itself, Claude takes over for that one rewrite — only if a Claude key is set.
 - **Claude:** best quality; about $0.002 per rewrite with Haiku.
-- **Better with Claude:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
+- **Reword:** on any free result (when a Claude key is saved), one click rewrites just that paragraph with Claude. You only pay when you choose to.
 - The free model gets extra style rules and a worked example (2–4 topics, no repeated facts, abbreviations spelled out), because small models copy examples closely.
 
 ## How the AI is kept honest

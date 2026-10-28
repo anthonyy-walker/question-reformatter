@@ -476,11 +476,11 @@
       if (el.hasAttribute("data-qr-suggested") || readingPanels.has(el)) continue;
       el.setAttribute("data-qr-suggested", "1");
       styleShadowRoot(el);
-      const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Reformat this paragraph",
+      const btn = rootAttrs(h("button.qr-suggest", { title: "Rewrite this paragraph in plain language", "aria-label": "Dyslexia Reading Aid: rewrite this paragraph",
         onclick: (e) => { e.preventDefault(); e.stopPropagation(); processReading(el); },
         onmouseenter: () => el.classList.add("qr-suggest-target"),
         onmouseleave: () => el.classList.remove("qr-suggest-target") },
-        icon("check", 13), "Reformat"), false);
+        icon("check", 13), "Dyslexia Reading Aid"), false);
       el.appendChild(btn);
       suggestCount++;
       queuePrefetch(el);
@@ -565,7 +565,7 @@
 
   // Word count, sentence length, share of long words, and a reading grade (Flesch–Kincaid).
   function textStats(raw) {
-    const t = raw.replace(/\bReformat\s*$/g, "").replace(/\s+/g, " ").trim();
+    const t = raw.replace(/\b(Reformat|Dyslexia Reading Aid)\s*$/g, "").replace(/\s+/g, " ").trim();
     if (t.length < 100) return null;
     const words = t.split(" ").filter((w) => /[A-Za-z]/.test(w));
     if (words.length < 15) return null;
@@ -675,10 +675,10 @@
       if (!anchorEl || anchorEl.closest("input,textarea,[contenteditable],[data-qr]")) return;
       const rect = range.getBoundingClientRect();
       hideSelBtn();
-      selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Reformat the selected text",
+      selBtn = rootAttrs(h("button.qr-suggest.qr-sel-btn", { "aria-label": "Dyslexia Reading Aid: rewrite the selected text",
         style: { top: Math.max(8, rect.bottom + 8) + "px", left: Math.max(8, Math.min(window.innerWidth - 140, rect.left)) + "px" },
         onclick: (ev) => { ev.preventDefault(); ev.stopPropagation(); hideSelBtn(); processSelection(range, text); } },
-        icon("check", 13), "Reformat"), false);
+        icon("check", 13), "Dyslexia Reading Aid"), false);
       document.body.appendChild(selBtn);
     }, 10);
   }, true);
@@ -718,7 +718,7 @@
     function header() {
       return h("div.qr-header", {},
         h("div.qr-header-actions", {},
-          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "Better with Claude"),
+          data && meta.upgrade && h("button.qr-btn", { title: "Rewrite this one with Claude (about $0.002)", onclick: meta.upgrade }, "Reword"),
           data && h("button.qr-btn", { "aria-pressed": String(showOriginal), onclick: () => { showOriginal = !showOriginal; setOriginalHidden(!showOriginal); draw(); } }, showOriginal ? "Hide original wording" : "Show original wording"),
           h("button.qr-btn.qr-btn-icon", { "aria-label": "Close reformatted view", onclick: close }, icon("close", 17))));
     }
