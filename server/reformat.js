@@ -111,4 +111,24 @@ async function reformat(body, connectionId) {
   }
 }
 
-module.exports = { reformat, parseStructured };
+// A rewrite the extension made on the computer (free model), or a saved copy it showed again.
+async function logExternal(body, connectionId) {
+  const settings = await db.getSettings();
+  const { kind, text, choices, math, site, pageTitle } = clean(body);
+  const model = body.model === "on-device" ? "on-device" : "my-server";
+  const arr = (x) => (Array.isArray(x) ? x.slice(0, 30).map((v) => String(v).slice(0, 500)) : []);
+  let result = null;
+  try { result = body.result && typeof body.result === "object" ? JSON.parse(JSON.stringify(body.result).slice(0, 60000)) : null; } catch (_) { result = null; }
+  const when = Date.parse(body.at);
+  const at = Number.isFinite(when) && when <= Date.now() + 60e3 && when > Date.now() - 30 * 864e5 ? new Date(when) : new Date();
+  await db.q(
+    `INSERT INTO rewrites (created_at, kind, site, page_title, model, status, cached, original, result, first_problems, final_problems, repaired, ms, connection_id)
+     VALUES ($1,$2,$3,$4,$5,'ok',$6,$7,$8,$9,'[]',$10,$11,$12)`,
+    [at, kind, site, pageTitle, model, !!body.cached,
+      settings.keepText ? { text, choices, math } : { text: "(text not kept)", choices: [], math: [] },
+      settings.keepText ? result : null, JSON.stringify(arr(body.firstProblems)), !!body.repaired,
+      Math.max(0, Math.min(Number(body.ms) || 0, 600000)), connectionId || null]);
+  return { ok: true };
+}
+
+module.exports = { reformat, logExternal, parseStructured };

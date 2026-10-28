@@ -1,5 +1,5 @@
 // db.js — Postgres storage: the rewrite log, saved results, connection codes,
-// read-only viewer links and settings. Tables are created on start.
+// and settings. Tables are created on start.
 const { Pool } = require("pg");
 
 const url = process.env.DATABASE_URL;
@@ -44,10 +44,6 @@ async function init() {
     CREATE TABLE IF NOT EXISTS connections (
       id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL, hint TEXT,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_used TIMESTAMPTZ, revoked BOOLEAN NOT NULL DEFAULT false
-    );
-    CREATE TABLE IF NOT EXISTS viewers (
-      id BIGSERIAL PRIMARY KEY, name TEXT NOT NULL, token_hash TEXT UNIQUE NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT now(), last_viewed TIMESTAMPTZ, revoked BOOLEAN NOT NULL DEFAULT false
     );
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB NOT NULL);
   `);

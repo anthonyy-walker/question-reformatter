@@ -54,11 +54,11 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
 The `server/` folder is a small server with a dashboard, made for Railway. It is not part of the extension; Chrome ignores it.
 
 - **What it does:** the extension sends text to your server. The server holds the Claude key, runs the same instructions and checks, and logs every rewrite.
+- **Every rewrite is logged**, including ones made by the free on-device model and saved copies shown again. If the server can't be reached, log entries wait on the computer and are sent later. Rewrites prepared in the background are logged only when you open them.
 - **Dashboard:**
   - Overview: rewrites per day, sites, how many passed the checks, cost.
   - Rewrites: every original next to the rewrite that was shown, with the check results.
   - Connect extension: make a connection code for each Chrome.
-  - Share a view: a private, read-only link for a professor or the disability office (no costs, no changes).
   - Settings: model, pause, keep or drop the text, clear the log.
 - **In the extension:** Settings → AI → **My server** → paste the server address and connection code → Test → Save.
   - If the server can't be reached, the free on-device model is used.

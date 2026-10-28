@@ -14,7 +14,7 @@ chrome.action.onClicked.addListener(() => chrome.runtime.openOptionsPage());
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   const handlers = {
-    QR_AI_REFORMAT: () => reformat(msg),
+    QR_AI_REFORMAT: () => reformatAndLog(msg),
     QR_OPEN_OPTIONS: async () => chrome.runtime.openOptionsPage(),
     QR_CACHE_STATS: () => cacheStats(),
     QR_CACHE_CLEAR: () => cacheClear(),
@@ -74,7 +74,8 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
       if (hit) {
         hit.lastUsed = Date.now();
         chrome.storage.local.set({ [key]: hit });
-        return { structured: hit.structured, cached: true, via: hit.via || m, savedAt: hit.savedAt };
+        return { structured: hit.structured, cached: true, via: hit.via || m, savedAt: hit.savedAt,
+          _log: { model: m === LOCAL_MODEL ? "on-device" : SERVER_MODEL, firstProblems: hit.firstProblems || [], repaired: !!hit.repaired } };
       }
     }
   }
@@ -127,9 +128,11 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
     let structured = r.structured;
     if (r.problems.length) structured = QRFormatter.repairSimple(text, choices, structured, mathText, { reading });
     const now = Date.now();
-    await chrome.storage.local.set({ [await keyFor(r.model)]: { structured, via: r.via, savedAt: now, lastUsed: now } });
+    const repaired = r.problems.length > 0;
+    await chrome.storage.local.set({ [await keyFor(r.model)]: { structured, via: r.via, savedAt: now, lastUsed: now, firstProblems: r.problems, repaired } });
     prune();
-    return { structured, cached: false, via: r.via };
+    // The server logs its own rewrites; on-device ones are sent to it afterwards (see reformatAndLog).
+    return { structured, cached: false, via: r.via, _log: r.model === SERVER_MODEL ? null : { model: "on-device", firstProblems: r.problems, repaired } };
   }
 
   // Preparing ahead of time: free on-device model only, one at a time, never Claude.
@@ -187,6 +190,54 @@ async function reformat({ text, choices, math, forceFresh, cacheOnly, kind, pref
 
   return finish(r);
 }
+
+// ---------- logging every rewrite to your server ----------
+// Every rewrite you open is logged on your server, including ones made on this computer
+// and saved copies. Rewrites prepared in the background are logged only when you open them.
+// If the server can't be reached, the log entry waits here and is sent next time.
+
+const LOG_QUEUE = "logq";
+async function reformatAndLog(msg) {
+  const started = Date.now();
+  const r = await reformat(msg);
+  const meta = r && r._log;
+  if (r) delete r._log;
+  if (meta && r.structured && !msg.prefetch && !msg.cacheOnly) {
+    const reading = msg.kind === "reading";
+    queueLog({
+      kind: reading ? "reading" : "question", text: msg.text, choices: reading ? [] : msg.choices || [],
+      math: msg.math || [], site: msg.site, pageTitle: msg.pageTitle, result: r.structured,
+      model: meta.model, cached: !!r.cached, firstProblems: meta.firstProblems, repaired: meta.repaired,
+      ms: Date.now() - started, at: new Date().toISOString(),
+    });
+  }
+  return r;
+}
+async function queueLog(entry) {
+  const { [LOG_QUEUE]: q = [] } = await chrome.storage.local.get(LOG_QUEUE);
+  q.push(entry);
+  await chrome.storage.local.set({ [LOG_QUEUE]: q.slice(-300) });
+  flushLogs();
+}
+let flushing = false;
+async function flushLogs() {
+  if (flushing) return;
+  flushing = true;
+  try {
+    const st = await chrome.storage.local.get(["serverUrl", "serverCode", LOG_QUEUE]);
+    const q = st[LOG_QUEUE] || [];
+    if (!st.serverCode || !q.length) return;
+    const url = st.serverUrl || DEFAULT_SERVER;
+    let sent = 0;
+    for (const entry of q) {
+      try { await serverFetch(url, st.serverCode, "/api/ext/log", entry); sent++; }
+      catch (_) { break; } // offline or server down: try again later
+    }
+    const { [LOG_QUEUE]: now = [] } = await chrome.storage.local.get(LOG_QUEUE);
+    await chrome.storage.local.set({ [LOG_QUEUE]: now.slice(sent) });
+  } finally { flushing = false; }
+}
+chrome.runtime.onStartup.addListener(() => { flushLogs(); });
 
 // ---------- providers ----------
 

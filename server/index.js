@@ -1,13 +1,12 @@
 // index.js — Dyslexia Reading Aid server.
 //   /api/reformat         the extension sends text here (needs a connection code)
 //   /                     the dashboard (needs DASHBOARD_PASSWORD)
-//   /v/<link>             read-only view for a professor or the disability office
 const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 const db = require("./db");
-const { reformat } = require("./reformat");
+const { reformat, logExternal } = require("./reformat");
 const P = require("../prompt.js");
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -73,11 +72,6 @@ async function connectionFor(req) {
   const { rows } = await db.q("UPDATE connections SET last_used = now() WHERE token_hash = $1 AND NOT revoked RETURNING id, name", [sha(m[1])]);
   return rows[0] || null;
 }
-async function viewerFor(token) {
-  if (!token) return null;
-  const { rows } = await db.q("UPDATE viewers SET last_viewed = now() WHERE token_hash = $1 AND NOT revoked RETURNING id, name", [sha(token)]);
-  return rows[0] || null;
-}
 
 const cost = (model, i, o) => { const p = PRICES[model]; return p ? (i * p[0] + o * p[1]) / 1e6 : null; };
 
@@ -93,11 +87,13 @@ async function stats(days) {
             count(*) FILTER (WHERE cached)::int AS cached,
             count(*) FILTER (WHERE status='ok' AND NOT cached AND jsonb_array_length(first_problems)=0)::int AS clean,
             count(*) FILTER (WHERE status='ok' AND NOT cached)::int AS fresh,
+            coalesce(avg(ms) FILTER (WHERE status='ok' AND NOT cached AND model='on-device'),0)::int AS avg_ms_local,
             count(*) FILTER (WHERE repaired AND NOT cached)::int AS repaired,
             count(*) FILTER (WHERE kind='question')::int AS questions,
             count(*) FILTER (WHERE kind='reading')::int AS reading,
+            count(*) FILTER (WHERE model='on-device')::int AS on_device,
             coalesce(sum(input_tokens),0)::bigint AS in_tok, coalesce(sum(output_tokens),0)::bigint AS out_tok,
-            coalesce(avg(ms) FILTER (WHERE status='ok' AND NOT cached),0)::int AS avg_ms
+            coalesce(avg(ms) FILTER (WHERE status='ok' AND NOT cached AND model<>'on-device'),0)::int AS avg_ms
           FROM rewrites WHERE created_at > ${since}`),
     db.q(`SELECT to_char(d, 'YYYY-MM-DD') AS day, coalesce(c.n,0)::int AS n FROM generate_series((now() - interval '${days - 1} days')::date, now()::date, interval '1 day') d
           LEFT JOIN (SELECT created_at::date AS day, count(*) AS n FROM rewrites WHERE created_at > ${since} GROUP BY 1) c ON c.day = d::date ORDER BY d`),
@@ -182,23 +178,15 @@ async function handle(req, res) {
     return send(res, 200, await reformat(await readBody(req), c.id));
   }
 
-  // ---- static
-  if (m === "GET" && (p === "/" || p.startsWith("/v/"))) return serveFile(res, path.join(__dirname, "dashboard.html"), "text/html; charset=utf-8");
-  if (m === "GET" && /^\/fonts\/[\w.-]+\.woff2$/.test(p)) return serveFile(res, path.join(FONT_DIR, path.basename(p)), "font/woff2");
-
-  // ---- read-only viewer
-  const vm = /^\/api\/view\/([\w-]+)\/(stats|rewrites|rewrite\/(\d+)|prompts|info)$/.exec(p);
-  if (vm && m === "GET") {
-    const v = await viewerFor(vm[1]);
-    if (!v) return fail(res, 404, "This link was turned off or doesn't exist.");
-    const what = vm[2];
-    if (what === "info") { const s = await db.getSettings(); return send(res, 200, { viewer: v.name, ownerName: s.ownerName }); }
-    if (what === "stats") return send(res, 200, await stats(u.searchParams.get("days")));
-    if (what === "rewrites") return send(res, 200, await listRewrites(u));
-    if (what === "prompts") return send(res, 200, prompts());
-    const r = await oneRewrite(vm[3]); delete (r || {}).connection;
-    return r ? send(res, 200, r) : fail(res, 404, "Not found");
+  if (p === "/api/ext/log" && m === "POST") {
+    const c = await connectionFor(req);
+    if (!c) return fail(res, 401, "That connection code isn't valid. Make a new one in the dashboard → Connections.");
+    return send(res, 200, await logExternal(await readBody(req), c.id));
   }
+
+  // ---- static
+  if (m === "GET" && p === "/") return serveFile(res, path.join(__dirname, "dashboard.html"), "text/html; charset=utf-8");
+  if (m === "GET" && /^\/fonts\/[\w.-]+\.woff2$/.test(p)) return serveFile(res, path.join(FONT_DIR, path.basename(p)), "font/woff2");
 
   // ---- dashboard login
   if (p === "/api/login" && m === "POST") {
@@ -239,8 +227,8 @@ async function handle(req, res) {
     }
   }
 
-  // connection codes (for the extension) and viewer links (read-only)
-  for (const [route, table, extra] of [["connections", "connections", "last_used"], ["viewers", "viewers", "last_viewed"]]) {
+  // connection codes (for the extension)
+  for (const [route, table, extra] of [["connections", "connections", "last_used"]]) {
     if (p === `/api/${route}`) {
       if (m === "GET") {
         const { rows } = await db.q(`SELECT id, name, created_at, ${extra} AS last${table === "connections" ? ", hint" : ""} FROM ${table} WHERE NOT revoked ORDER BY created_at DESC`);

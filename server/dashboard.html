@@ -102,7 +102,7 @@ main { padding: 32px clamp(16px, 4vw, 48px) 60px; min-width: 0; max-width: 1180p
 .grid > .card, .compare > .card { margin-top: 0; }
 .card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
 .grid { display: grid; gap: 16px; }
-.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)); margin-bottom: 16px; }
 .two { grid-template-columns: 1.6fr 1fr; }
 @media (max-width: 980px) { .two { grid-template-columns: 1fr; } }
 .tile { padding: 16px 18px; }
@@ -222,13 +222,15 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   const fmtMoney = (n) => n == null ? "—" : n < 0.01 && n > 0 ? "<$0.01" : "$" + n.toFixed(2);
   const fmtSec = (ms) => ms ? (ms / 1000).toFixed(1) + "s" : "—";
   const fmtWhen = (d) => { const x = new Date(d); return x.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " · " + x.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); };
+  const MODEL_NAMES = { "on-device": "Free on-device model (Gemini Nano)", "my-server": "Saved copy on the computer (made by this server)", "claude-haiku-4-5-20251001": "Claude Haiku 4.5", "claude-sonnet-5-5": "Claude Sonnet 5.5" };
+  const modelName = (m) => MODEL_NAMES[m] || m || "—";
   const fmtDay = (s) => new Date(s + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
   const ago = (d) => { if (!d) return "never"; const s = (Date.now() - new Date(d)) / 1000; if (s < 90) return "just now"; if (s < 3600) return Math.round(s / 60) + " min ago"; if (s < 86400) return Math.round(s / 3600) + " h ago"; return Math.round(s / 86400) + " days ago"; };
   const ICONS = {
     overview: '<path d="M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z"/>',
     list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
     plug: '<path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/>',
-    share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
+    chip: '<rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/>',
     gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
     book: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
     check: '<path d="M20 6 9 17l-5-5"/>',
@@ -254,18 +256,16 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   }
 
   // ------------------------------------------------------------ mode + api
-  const viewToken = (location.pathname.match(/^\/v\/([\w-]+)/) || [])[1] || null;
-  const VIEWER = !!viewToken;
   async function api(path, opts = {}) {
-    const url = VIEWER ? `/api/view/${viewToken}${path.replace(/^\/rewrites\/(\d+)$/, "/rewrite/$1")}` : "/api" + path;
+    const url = "/api" + path;
     const res = await fetch(url, { method: opts.method || "GET", headers: opts.body ? { "content-type": "application/json" } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined, credentials: "same-origin" });
     const data = await res.json().catch(() => ({}));
-    if (res.status === 401 && !VIEWER && path !== "/login") { showLogin(); throw new Error("login"); }
+    if (res.status === 401 && path !== "/login") { showLogin(); throw new Error("login"); }
     if (!res.ok) throw new Error(data.error || "Something went wrong.");
     return data;
   }
 
-  const BRAND = `<div class="brand"><div class="mark">${icon("lines", 20)}</div><div><b>Dyslexia Reading Aid</b><span>${VIEWER ? "Shared view" : "Server dashboard"}</span></div></div>`;
+  const BRAND = `<div class="brand"><div class="mark">${icon("lines", 20)}</div><div><b>Dyslexia Reading Aid</b><span>Server dashboard</span></div></div>`;
 
   // ------------------------------------------------------------ login
   function showLogin(err) {
@@ -282,15 +282,12 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   }
 
   // ------------------------------------------------------------ shell
-  const PAGES = VIEWER
-    ? [["overview", "Overview", "overview"], ["rewrites", "Rewrites", "list"], ["how", "How it works", "book"]]
-    : [["overview", "Overview", "overview"], ["rewrites", "Rewrites", "list"], ["connect", "Connect extension", "plug"], ["share", "Share a view", "share"], ["how", "How it works", "book"], ["settings", "Settings", "gear"]];
-  let info = {};
+  const PAGES = [["overview", "Overview", "overview"], ["rewrites", "Rewrites", "list"], ["connect", "Connect extension", "plug"], ["how", "How it works", "book"], ["settings", "Settings", "gear"]];
   function shell() {
     $app.innerHTML = `<div class="shell"><nav class="side" aria-label="Main">${BRAND}
       ${PAGES.map(([id, label, ic]) => `<button class="nav" data-go="${id}">${icon(ic)}<span class="lbl">${label}</span></button>`).join("")}
       <div class="side-foot"><button class="nav" id="theme">${icon("moon")}<span class="lbl">Light / dark</span></button>
-      ${VIEWER ? "" : `<button class="nav" id="logout">${icon("out")}<span class="lbl">Log out</span></button>`}</div></nav>
+      <button class="nav" id="logout">${icon("out")}<span class="lbl">Log out</span></button></div></nav>
       <main id="main" tabindex="-1"></main></div>`;
     $app.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(b.dataset.go)));
     document.getElementById("theme").onclick = toggleTheme;
@@ -310,13 +307,12 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     document.querySelectorAll("[data-go]").forEach((b) => b.setAttribute("aria-current", b.dataset.go === (cur === "rewrite" ? "rewrites" : cur) ? "page" : "false"));
     const main = document.getElementById("main");
     main.innerHTML = "";
-    const v = { overview, rewrites, rewrite, connect, share, how, settings }[cur];
+    const v = { overview, rewrites, rewrite, connect, how, settings }[cur];
     v(main, arg).catch((e) => { if (e.message !== "login") main.innerHTML = `<div class="err">${esc(e.message)}</div>`; });
     main.focus({ preventScroll: true });
     window.scrollTo(0, 0);
   }
   const head = (title, sub, right = "") => `<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ""}</div>${right}</div>`;
-  const viewerBanner = () => VIEWER ? `<div class="banner">${icon("share")}<div>Read-only view${info.ownerName ? ` of <b>${esc(info.ownerName)}</b>'s rewrites` : ""}, shared with <b>${esc(info.viewer || "you")}</b>. Every original is shown next to its rewrite.</div></div>` : "";
 
   // ------------------------------------------------------------ overview
   let days = 30;
@@ -324,14 +320,15 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     const s = await api(`/stats?days=${days}`);
     const fresh = s.fresh || 0;
     const pct = (n) => fresh ? Math.round((n / fresh) * 100) + "%" : "—";
-    main.innerHTML = viewerBanner() + head("Overview", `The last ${days} days`,
+    main.innerHTML = head("Overview", `The last ${days} days`,
       `<div class="seg" role="group" aria-label="Time range">${[7, 30, 90].map((d) => `<button data-d="${d}" aria-pressed="${d === days}">${d} days</button>`).join("")}</div>`) +
       `<div class="grid tiles fade">
         ${tile("Rewrites", fmtN(s.total), `${fmtN(s.questions)} questions · ${fmtN(s.reading)} reading`)}
+        ${tile("Made on-device", fmtN(s.on_device), `${fmtN(s.total - s.on_device)} made by Claude`)}
         ${tile("Passed every check", pct(s.clean), "on the first try")}
         ${tile("Fixed automatically", fmtN(s.repaired), "patched with the original's words")}
-        ${tile("Average time", fmtSec(s.avg_ms), `${fmtN(s.cached)} came from saved results`)}
-        ${VIEWER ? "" : tile("Claude cost", fmtMoney(s.cost), `${fmtN(s.in_tok + s.out_tok)} tokens`)}
+        ${tile("Average time", fmtSec(s.avg_ms), (s.on_device ? `with Claude · ${fmtSec(s.avg_ms_local)} on-device` : "with Claude") + ` · ${fmtN(s.cached)} saved copies`)}
+        ${tile("Claude cost", fmtMoney(s.cost), `${fmtN(s.in_tok + s.out_tok)} tokens`)}
       </div>
       <div class="grid two fade">
         <section class="card"><div class="card-head"><h2>Rewrites per day</h2><span class="muted small">${s.errors ? `${fmtN(s.errors)} failed` : "no failures"}</span></div>${s.total ? barChart(s.byDay) : emptyMsg()}</section>
@@ -341,7 +338,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     wireChart(main);
   }
   const tile = (k, v, h) => `<div class="card tile"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
-  const emptyMsg = () => `<div class="empty"><b>Nothing yet</b>${VIEWER ? "No rewrites in this time range." : "Connect the extension, then rewrite something."}</div>`;
+  const emptyMsg = () => `<div class="empty"><b>Nothing yet</b>Connect the extension, then rewrite something.</div>`;
 
   function barChart(rows) {
     const W = 640, H = 220, L = 30, B = 26, T = 8;
@@ -385,7 +382,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   // ------------------------------------------------------------ rewrites list
   let listState = { q: "", kind: "", offset: 0 };
   async function rewrites(main) {
-    main.innerHTML = viewerBanner() + head("Rewrites", "Every original, next to the rewrite that was shown. Newest first.") +
+    main.innerHTML = head("Rewrites", "Every original, next to the rewrite that was shown. Newest first.") +
       `<div class="toolbar"><input class="input" id="q" type="search" placeholder="Search text or site" value="${esc(listState.q)}" aria-label="Search">
        <div class="seg" role="group" aria-label="Kind">${[["", "All"], ["question", "Questions"], ["reading", "Reading"]].map(([k, l]) => `<button data-k="${k}" aria-pressed="${listState.kind === k}">${l}</button>`).join("")}</div></div>
        <section class="card" id="lc"><div class="empty">Loading…</div></section>`;
@@ -396,7 +393,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
       const lc = main.querySelector("#lc");
       const p = new URLSearchParams({ limit: 30, offset: listState.offset }); if (listState.q) p.set("q", listState.q); if (listState.kind) p.set("kind", listState.kind);
       const d = await api(`/rewrites?${p}`);
-      if (!d.rows.length) { lc.innerHTML = `<div class="empty"><b>No rewrites found</b>${listState.q ? "Try a different search." : VIEWER ? "" : "Rewrites from the extension show up here."}</div>`; return; }
+      if (!d.rows.length) { lc.innerHTML = `<div class="empty"><b>No rewrites found</b>${listState.q ? "Try a different search." : "Rewrites from the extension show up here."}</div>`; return; }
       lc.innerHTML = `<div class="list">${d.rows.map(itemRow).join("")}</div>
         <div class="pager"><span class="muted small">${listState.offset + 1}–${listState.offset + d.rows.length} of ${fmtN(d.total)}</span>
         <div class="row"><button class="btn btn-sm" id="prev" ${listState.offset ? "" : "disabled"}>Newer</button><button class="btn btn-sm" id="next" ${listState.offset + d.rows.length < d.total ? "" : "disabled"}>Older</button></div></div>`;
@@ -413,7 +410,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   const kindChip = (k) => `<span class="chip accent">${k === "question" ? "Question" : "Reading"}</span>`;
   const itemRow = (r) => `<button class="item" data-id="${r.id}"><span class="when">${fmtWhen(r.created_at)}</span>
     <span class="what"><span class="meta"><span class="site">${esc((r.site || "Unknown site").replace(/^www\./, ""))}</span></span><span class="preview">${esc(r.summary || r.preview || "")}</span></span>
-    <span class="meta">${kindChip(r.kind)}${statusChip(r)}${r.cached ? '<span class="chip">Saved</span>' : ""}</span></button>`;
+    <span class="meta">${kindChip(r.kind)}${r.model === "on-device" ? `<span class="chip">${icon("chip", 13)} On-device</span>` : ""}${statusChip(r)}${r.cached ? '<span class="chip">Saved</span>' : ""}</span></button>`;
 
   // ------------------------------------------------------------ one rewrite
   async function rewrite(main, id) {
@@ -421,7 +418,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     const math = Object.fromEntries(((r.original && r.original.math) || []).map((m) => [m.token, m.text]));
     const o = r.original || {}, s = r.result;
     const first = r.first_problems || [], fin = r.final_problems || [];
-    main.innerHTML = viewerBanner() + `<button class="btn btn-sm" id="back" style="margin-bottom:16px">${icon("back", 16)} All rewrites</button>` +
+    main.innerHTML = `<button class="btn btn-sm" id="back" style="margin-bottom:16px">${icon("back", 16)} All rewrites</button>` +
       head(esc((r.site || "Unknown site").replace(/^www\./, "")), esc(r.page_title || "") , `<div class="row">${kindChip(r.kind)}${statusChip(r)}</div>`) +
       `<div class="compare fade">
         <section class="card"><div class="label-top">Original</div><div class="orig">${rich(o.text, math)}</div>
@@ -432,10 +429,10 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
         <div class="checks">${checksBlock(r, first, fin)}</div></section>
       <section class="card fade"><div class="card-head"><h2>Details</h2></div><div class="facts">
         <div><span>When</span>${esc(new Date(r.created_at).toLocaleString())}</div>
-        <div><span>AI model</span>${esc(r.cached ? "Saved result" : r.model || "—")}</div>
+        <div><span>Made by</span>${esc(modelName(r.model))}${r.cached && r.model !== "my-server" ? " (saved copy)" : ""}</div>
         <div><span>Time</span>${fmtSec(r.ms)}</div>
-        ${VIEWER ? "" : `<div><span>Tokens</span>${fmtN(r.input_tokens)} in · ${fmtN(r.output_tokens)} out</div><div><span>Cost</span>${fmtMoney(r.cost)}</div><div><span>From</span>${esc(r.connection || "—")}</div>`}
-      </div>${VIEWER ? "" : `<div class="row" style="margin-top:16px"><button class="btn btn-sm btn-danger" id="del">Delete this rewrite</button></div>`}</section>`;
+        <div><span>Tokens</span>${fmtN(r.input_tokens)} in · ${fmtN(r.output_tokens)} out</div><div><span>Cost</span>${fmtMoney(r.cost)}</div><div><span>From</span>${esc(r.connection || "—")}</div>
+      </div><div class="row" style="margin-top:16px"><button class="btn btn-sm btn-danger" id="del">Delete this rewrite</button></div></section>`;
     main.querySelector("#back").onclick = () => go("rewrites");
     const del = main.querySelector("#del");
     if (del) del.onclick = async () => { if (!confirm("Delete this rewrite from the log?")) return; await api(`/rewrites/${id}`, { method: "DELETE" }); toast("Deleted"); go("rewrites"); };
@@ -495,47 +492,15 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     drawList();
   }
 
-  // ------------------------------------------------------------ share
-  async function share(main) {
-    const list = await api("/viewers");
-    main.innerHTML = head("Share a view", "A private, read-only link for a professor or the disability office.") +
-      `<div class="grid two">
-        <section class="card fade"><h2 style="margin-bottom:12px">What they can see</h2><ul class="steps">
-          <li>The overview: how many rewrites, and how many passed the checks.</li>
-          <li>Every original next to the rewrite that was shown, with the check results.</li>
-          <li>The exact instructions the AI gets.</li></ul>
-          <p class="help">They can't change anything, see your costs, or make connection codes. Turn a link off any time.</p></section>
-        <section class="card fade"><h2 style="margin-bottom:12px">New link</h2>
-          <form id="vf"><div class="field"><label for="vn">Who it's for</label><input class="input" id="vn" placeholder="Services for Students with Disabilities" maxlength="80"></div>
-          <button class="btn btn-primary">Make link</button></form><div id="newlink"></div></section>
-      </div>
-      <section class="card fade" style="margin-top:16px"><div class="card-head"><h2>Active links</h2></div><div id="vl"></div></section>`;
-    main.querySelector("#vf").onsubmit = async (e) => {
-      e.preventDefault();
-      const r = await api("/viewers", { method: "POST", body: { name: main.querySelector("#vn").value } });
-      const link = `${location.origin}/v/${r.token}`;
-      main.querySelector("#newlink").innerHTML = `<div class="fade" style="margin-top:16px"><span class="lbl-strong">Link — copy it now, it's only shown once</span><div class="row" style="margin-top:6px"><div class="code" style="flex:1">${esc(link)}</div><button class="btn btn-sm btn-primary" id="cpl">${icon("copy", 15)} Copy</button></div></div>`;
-      main.querySelector("#cpl").onclick = () => copy(link);
-      list.unshift({ ...r, last: null }); drawList();
-    };
-    function drawList() {
-      const el = main.querySelector("#vl");
-      el.innerHTML = list.length ? list.map((c) => `<div class="switch" style="align-items:center;justify-content:space-between"><div><b>${esc(c.name)}</b><div class="help">Made ${ago(c.created_at)} · last opened ${ago(c.last)}</div></div><button class="btn btn-sm btn-danger" data-rv="${c.id}">Turn off</button></div>`).join("")
-        : `<div class="empty"><b>No links yet</b>Make one above.</div>`;
-      el.querySelectorAll("[data-rv]").forEach((b) => (b.onclick = async () => { if (!confirm("Turn off this link? It will stop working right away.")) return; await api(`/viewers/${b.dataset.rv}`, { method: "DELETE" }); list.splice(list.findIndex((c) => c.id == b.dataset.rv), 1); drawList(); toast("Turned off"); }));
-    }
-    drawList();
-  }
-
   // ------------------------------------------------------------ how it works
   async function how(main) {
     const p = await api("/prompts");
-    main.innerHTML = viewerBanner() + head("How it works", "What happens to each piece of text, in order.") +
+    main.innerHTML = head("How it works", "What happens to each piece of text, in order.") +
       `<section class="card fade"><ol class="steps">
         <li><b>The student picks the text.</b> Nothing is rewritten until they click.</li>
         <li><b>The AI gets fixed instructions</b> (below) and the text. It is told to use short, plain sentences and keep every number, name and meaning-changing word.${" "}On questions it must not solve, hint, rule out choices or reorder them.</li>
         <li><b>Code checks the rewrite</b> against the original: every number, math expression and word like "not" or "except" must still be there, nothing may be invented, and every answer choice must be there in the same order.</li>
-        <li><b>If a check fails</b>, the AI gets one try to fix it. Anything still wrong is patched in code with the original's own words.</li>
+        <li><b>If a check fails</b>, Claude (on the server) gets one try to fix it. Anything still wrong is patched in code with the original's own words.</li>
         <li><b>The original wording</b> is one click away at all times, and answers are always marked on the real question.</li></ol></section>
       <section class="card fade"><details open><summary>Instructions for questions (version ${esc(p.question.version)})</summary><pre class="prompt">${esc(p.question.text)}</pre></details></section>
       <section class="card fade"><details><summary>Instructions for other reading (version ${esc(p.reading.version)})</summary><pre class="prompt">${esc(p.reading.text)}</pre></details></section>`;
@@ -546,12 +511,11 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
     const s = await api("/settings");
     main.innerHTML = head("Settings", "") + `<div class="grid two">
       <section class="card fade"><form id="sf">
-        <div class="field"><label for="on">Your name</label><input class="input" id="on" value="${esc(s.ownerName)}" maxlength="80" placeholder="Shown on shared links"></div>
         <div class="field"><label for="md">AI model</label><select class="input" id="md">
           ${[["claude-haiku-4-5-20251001", "Claude Haiku 4.5 — fast, about $0.002 per rewrite"], ["claude-sonnet-5-5", "Claude Sonnet 5.5 — higher quality, costs more"]].map(([v, l]) => `<option value="${v}" ${s.model === v ? "selected" : ""}>${l}</option>`).join("")}
           ${["claude-haiku-4-5-20251001", "claude-sonnet-5-5"].includes(s.model) ? "" : `<option value="${esc(s.model)}" selected>${esc(s.model)}</option>`}
         </select></div>
-        <label class="switch"><input type="checkbox" id="kt" ${s.keepText ? "checked" : ""}><span><b>Keep the text in the log</b><br><span class="help">Needed for the side-by-side view and shared links. Off = only counts and check results are kept.</span></span></label>
+        <label class="switch"><input type="checkbox" id="kt" ${s.keepText ? "checked" : ""}><span><b>Keep the text in the log</b><br><span class="help">Needed for the side-by-side view. Off = only counts and check results are kept.</span></span></label>
         <label class="switch"><input type="checkbox" id="pz" ${s.paused ? "checked" : ""}><span><b>Pause the server</b><br><span class="help">The extension falls back to the free on-device model.</span></span></label>
         <button class="btn btn-primary" style="margin-top:8px">Save</button></form></section>
       <section class="card fade"><h2 style="margin-bottom:12px">Status</h2>
@@ -562,7 +526,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
         <button class="btn btn-danger" id="wipe">Delete everything</button></section></div>`;
     main.querySelector("#sf").onsubmit = async (e) => {
       e.preventDefault();
-      await api("/settings", { method: "PUT", body: { ownerName: main.querySelector("#on").value, model: main.querySelector("#md").value, keepText: main.querySelector("#kt").checked, paused: main.querySelector("#pz").checked } });
+      await api("/settings", { method: "PUT", body: { model: main.querySelector("#md").value, keepText: main.querySelector("#kt").checked, paused: main.querySelector("#pz").checked } });
       toast("Saved");
     };
     main.querySelector("#wipe").onclick = async () => { if (!confirm("Delete every logged rewrite? This can't be undone.")) return; await api("/rewrites", { method: "DELETE" }); toast("Log cleared"); };
@@ -571,8 +535,7 @@ details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
   // ------------------------------------------------------------ start
   async function start() {
     try {
-      if (VIEWER) info = await api("/info");
-      else { const me = await api("/me"); if (!me.loggedIn) return showLogin(me.passwordSet ? "" : "Set DASHBOARD_PASSWORD in Railway → Variables, then log in."); }
+      const me = await api("/me"); if (!me.loggedIn) return showLogin(me.passwordSet ? "" : "Set DASHBOARD_PASSWORD in Railway → Variables, then log in.");
     } catch (e) {
       if (e.message === "login") return;
       $app.innerHTML = `<div class="login"><div class="card">${BRAND}<div class="err">${esc(e.message)}</div></div></div>`; return;

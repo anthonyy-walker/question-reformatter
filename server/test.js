@@ -77,14 +77,14 @@ async function main() {
     assert.ok(one.first_problems.length > 0 && one.self_fixed, "first rewrite should record the fixed problem");
     assert.equal((await A("/api/rewrites?q=wikipedia")).body.total, 1);
 
-    // viewer link: read-only, no costs, no writes
-    const vt = (await A("/api/viewers", { method: "POST", body: JSON.stringify({ name: "SSD" }) })).body.token;
-    const V = (p) => fetch(`${base}/api/view/${vt}${p}`).then(j);
-    assert.equal((await V("/info")).body.viewer, "SSD");
-    assert.equal((await V("/rewrites")).body.total, 3);
-    assert.ok((await V("/rewrite/" + list.rows[0].id)).body.result);
-    assert.equal((await fetch(`${base}/api/view/bad/info`)).status, 404);
-    assert.equal((await fetch(base + "/v/" + vt)).status, 200);
+    // on-device rewrite logged by the extension
+    const lg = await E("/api/ext/log", { kind: "reading", site: "umich.instructure.com", text: "A long paragraph about the syllabus that was rewritten on the computer.", model: "on-device", result: { summary: "Syllabus rules.", sections: [] }, firstProblems: ["Numbers missing: 3"], repaired: true, ms: 4100 });
+    assert.equal(lg.status, 200);
+    const st2 = (await A("/api/stats?days=30")).body;
+    assert.equal(st2.total, 4); assert.equal(st2.on_device, 1);
+    const top = (await A("/api/rewrites?limit=1")).body.rows[0];
+    assert.equal(top.model, "on-device"); assert.equal(top.repaired, true);
+    assert.equal((await fetch(base + "/api/view/x/info")).status, 401, "sharing is gone");
 
     // revoke
     const cid = (await A("/api/connections")).body[0].id;
