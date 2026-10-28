@@ -27,6 +27,7 @@
 
   // Frames: run reading mode inside real content frames (e.g. course pages), skip tiny ones (ads, widgets).
   const IN_FRAME = window.top !== window;
+  if (document.querySelector('meta[name="dra-dashboard"]')) return; // our own dashboard
   if (IN_FRAME && (QUESTION_SITE || innerWidth < 320 || innerHeight < 200)) return;
 
   loadSettings().then((s) => {
@@ -44,7 +45,7 @@
 
   chrome.storage.onChanged.addListener((changes) => {
     let touched = false;
-    ["textSize", "theme", "apiKey", "model", "suggest", "offSites", "provider", "prefetch"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
+    ["textSize", "theme", "apiKey", "model", "suggest", "offSites", "provider", "prefetch", "serverUrl", "serverCode"].forEach((k) => { if (changes[k]) { settings[k] = changes[k].newValue; touched = true; } });
     if (changes.offSites || changes.suggest) { siteOff = (settings.offSites || []).includes(HOST); refreshSuggestions(); }
     if (touched) { applyLook(); renderToolbar(); }
   });
@@ -421,6 +422,7 @@
     working++; renderToolbar();
     chrome.runtime.sendMessage({
       type: "QR_AI_REFORMAT", kind, useClaude: !!useClaude, text: read.text, choices: read.choices,
+      site: location.hostname, pageTitle: document.title.slice(0, 300),
       math: read.math.map(({ token, text }) => ({ token, text })),
       cacheOnly: !!restoring, // coming back to a page never spends tokens on its own
     }, (resp) => {
@@ -434,7 +436,7 @@
       const via = resp.result.via;
       ctrl.show(F.tidyLines(resp.result.structured), {
         // Free result + a Claude key saved → offer a one-click better version (pay only when you want it).
-        upgrade: via === "local" && settings.apiKey ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
+        upgrade: via === "local" && (settings.apiKey || (settings.serverUrl && settings.serverCode)) ? () => runAI(ctrl, read, { kind, onDone, onMiss, useClaude: true }) : null,
       });
       onDone && onDone();
     });

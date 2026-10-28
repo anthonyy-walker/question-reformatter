@@ -1,0 +1,586 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dyslexia Reading Aid</title>
+<meta name="robots" content="noindex">
+<meta name="dra-dashboard" content="1">
+<style>
+@font-face { font-family: "Atk"; font-weight: 400; font-display: swap; src: url("/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atk"; font-weight: 700; font-display: swap; src: url("/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Atk"; font-weight: 400; font-style: italic; font-display: swap; src: url("/fonts/atkinson-hyperlegible-latin-400-italic.woff2") format("woff2"); }
+
+:root {
+  --bg: #EEF3F1; --card: #FFFFFF; --sub: #F3F6F5; --border: #D5DEDB; --border-2: #9FB1AB;
+  --ink: #1A2321; --ink-2: #34413E; --ink-3: #5B6A66;
+  --metal: linear-gradient(135deg, #3F7F70 0%, #1C5245 32%, #0F3A31 55%, #1F5A4C 78%, #0C3029 100%);
+  --metal-hover: linear-gradient(135deg, #4C9181 0%, #23604F 32%, #134638 55%, #286A5A 78%, #10392F 100%);
+  --edge: inset 0 1px 0 rgba(255,255,255,.28), inset 0 -1px 0 rgba(0,0,0,.25), 0 1px 2px rgba(10,40,33,.25);
+  --accent: #174A3E; --accent-ink: #FFFFFF; --accent-soft: #E5EFEB; --bar: #2A6B5B;
+  --focus: #2E4BA8; --warn-bg: #FBF3E2; --warn-border: #D9B56A; --warn-ink: #4D3A06;
+  --bad-bg: #FBE9E7; --bad-border: #D98C80; --bad-ink: #6B1E12;
+  --good-ink: #1F5A3A;
+  --shadow: 0 1px 2px rgba(16,38,33,.06), 0 10px 28px rgba(16,38,33,.10);
+  --r-sm: 6px; --r-md: 10px; --r-pill: 999px;
+  --font: "Atk", "Atkinson Hyperlegible", system-ui, sans-serif;
+  --ease: cubic-bezier(.2,.7,.2,1);
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #101413; --card: #1A201F; --sub: #222A28; --border: #34403C; --border-2: #56665F;
+  --ink: #E8EFEC; --ink-2: #C3CEC9; --ink-3: #9AA9A3;
+  --metal: linear-gradient(135deg, #6FB09F 0%, #3E8270 32%, #2A6556 55%, #4A8F7D 78%, #24594C 100%);
+  --metal-hover: linear-gradient(135deg, #82C2B1 0%, #4A9180 32%, #327464 55%, #57A08D 78%, #2B6858 100%);
+  --edge: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.4);
+  --accent: #7CC0AE; --accent-ink: #06201A; --accent-soft: #1C3530; --bar: #6FB09F;
+  --focus: #A8B9FF; --warn-bg: #33291A; --warn-border: #7A6230; --warn-ink: #F1DDAE;
+  --bad-bg: #3A1F1B; --bad-border: #8A4A40; --bad-ink: #F4C7BE; --good-ink: #9BD9B3;
+  --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.35);
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101413; --card: #1A201F; --sub: #222A28; --border: #34403C; --border-2: #56665F;
+    --ink: #E8EFEC; --ink-2: #C3CEC9; --ink-3: #9AA9A3;
+    --metal: linear-gradient(135deg, #6FB09F 0%, #3E8270 32%, #2A6556 55%, #4A8F7D 78%, #24594C 100%);
+    --metal-hover: linear-gradient(135deg, #82C2B1 0%, #4A9180 32%, #327464 55%, #57A08D 78%, #2B6858 100%);
+    --edge: inset 0 1px 0 rgba(255,255,255,.3), inset 0 -1px 0 rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.4);
+    --accent: #7CC0AE; --accent-ink: #06201A; --accent-soft: #1C3530; --bar: #6FB09F;
+    --focus: #A8B9FF; --warn-bg: #33291A; --warn-border: #7A6230; --warn-ink: #F1DDAE;
+    --bad-bg: #3A1F1B; --bad-border: #8A4A40; --bad-ink: #F4C7BE; --good-ink: #9BD9B3;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 28px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 400 16px/1.55 var(--font); letter-spacing: .005em; -webkit-font-smoothing: antialiased; }
+button, input, select, textarea { font: inherit; color: inherit; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+main:focus, main:focus-visible { outline: none; }
+h1, h2, h3 { margin: 0; line-height: 1.25; }
+h1 { font-size: 26px; }
+h2 { font-size: 19px; }
+h3 { font-size: 16px; }
+.muted { color: var(--ink-3); }
+.small { font-size: 14px; }
+[hidden] { display: none !important; }
+
+/* ---------- layout */
+.shell { display: grid; grid-template-columns: 248px 1fr; min-height: 100vh; }
+.side { background: var(--card); border-right: 1px solid var(--border); padding: 22px 14px; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; gap: 4px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 8px 18px; }
+.mark { width: 34px; height: 34px; border-radius: 9px; background: var(--metal); box-shadow: var(--edge); display: grid; place-items: center; color: var(--accent-ink); flex: none; }
+.brand b { display: block; font-size: 16px; line-height: 1.2; }
+.brand span { font-size: 13px; color: var(--ink-3); }
+.nav { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-radius: var(--r-sm); background: none; text-align: left; cursor: pointer; color: var(--ink-2); font-weight: 700; font-size: 15px; transition: background .15s; }
+.nav:hover { background: var(--sub); }
+.nav[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
+.nav svg { flex: none; }
+.side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 4px; }
+main { padding: 32px clamp(16px, 4vw, 48px) 60px; min-width: 0; max-width: 1180px; width: 100%; }
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 22px; }
+.page-head p { margin: 6px 0 0; color: var(--ink-3); }
+.banner { background: var(--accent-soft); border: 1px solid var(--border); border-radius: var(--r-md); padding: 12px 16px; margin-bottom: 22px; display: flex; gap: 10px; align-items: center; }
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; padding: 12px 16px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .brand { width: 100%; padding-bottom: 8px; }
+  .nav { width: auto; padding: 7px 10px; }
+  .nav span.lbl { font-size: 14px; }
+  .side-foot { margin: 0; flex-direction: row; }
+  main { padding-top: 22px; }
+}
+
+/* ---------- pieces */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--r-md); padding: 20px; box-shadow: var(--shadow); }
+.card + .card { margin-top: 16px; }
+.grid > .card, .compare > .card { margin-top: 0; }
+.card-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.grid { display: grid; gap: 16px; }
+.tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); margin-bottom: 16px; }
+.two { grid-template-columns: 1.6fr 1fr; }
+@media (max-width: 980px) { .two { grid-template-columns: 1fr; } }
+.tile { padding: 16px 18px; }
+.tile .k { font-size: 14px; color: var(--ink-3); font-weight: 700; }
+.tile .v { font-size: 30px; font-weight: 700; line-height: 1.15; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.tile .h { font-size: 14px; color: var(--ink-3); margin-top: 2px; }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: var(--r-sm); border: 1px solid var(--border-2); background: var(--card); color: var(--ink); font-weight: 700; font-size: 15px; cursor: pointer; transition: background .15s, transform .1s; white-space: nowrap; }
+.btn:hover { background: var(--sub); }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--metal); color: var(--accent-ink); border-color: transparent; box-shadow: var(--edge); }
+.btn-primary:hover { background: var(--metal-hover); }
+.btn-danger { color: var(--bad-ink); border-color: var(--bad-border); }
+.btn-danger:hover { background: var(--bad-bg); }
+.btn-sm { min-height: 32px; padding: 4px 12px; font-size: 14px; }
+.btn:disabled { opacity: .55; cursor: default; }
+.input, select.input { width: 100%; min-height: 42px; padding: 8px 12px; border: 1px solid var(--border-2); border-radius: var(--r-sm); background: var(--card); }
+.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
+.field { display: grid; gap: 6px; margin-bottom: 16px; }
+.field label, .lbl-strong { font-weight: 700; }
+.help { font-size: 14px; color: var(--ink-3); }
+.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: var(--r-pill); font-size: 13px; font-weight: 700; border: 1px solid var(--border); background: var(--sub); color: var(--ink-2); white-space: nowrap; }
+.chip.good { color: var(--good-ink); }
+.chip.warn { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-ink); }
+.chip.bad { background: var(--bad-bg); border-color: var(--bad-border); color: var(--bad-ink); }
+.chip.accent { background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+.seg { display: inline-flex; border: 1px solid var(--border-2); border-radius: var(--r-sm); overflow: hidden; }
+.seg button { border: 0; background: var(--card); padding: 6px 14px; font-weight: 700; font-size: 14px; cursor: pointer; color: var(--ink-2); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--metal); color: var(--accent-ink); }
+.code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background: var(--sub); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px; word-break: break-all; }
+.empty { text-align: center; padding: 40px 20px; color: var(--ink-3); }
+.empty b { display: block; color: var(--ink); font-size: 17px; margin-bottom: 4px; }
+
+/* ---------- chart */
+.chart { position: relative; }
+.chart svg { display: block; width: 100%; height: 220px; overflow: visible; }
+.chart .grid-line { stroke: var(--border); stroke-width: 1; }
+.chart .axis { fill: var(--ink-3); font-size: 12px; font-family: var(--font); }
+.chart .bar { fill: var(--bar); transition: opacity .15s; }
+.chart .hit { fill: transparent; cursor: default; }
+.chart .hit:hover + .bar, .chart .bar.on { opacity: .75; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--card); padding: 6px 10px; border-radius: var(--r-sm); font-size: 13px; white-space: nowrap; transform: translate(-50%, -110%); box-shadow: var(--shadow); }
+.hbars { display: grid; gap: 10px; }
+.hbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 14px; }
+.hbar .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.hbar .num { color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.hbar .track { grid-column: 1 / -1; height: 8px; background: var(--sub); border-radius: 4px; overflow: hidden; }
+.hbar .fill { height: 100%; background: var(--bar); border-radius: 4px; }
+
+/* ---------- list */
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.toolbar .input { max-width: 340px; }
+.list { display: grid; gap: 0; }
+.item { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 14px; align-items: start; padding: 14px 6px; border-top: 1px solid var(--border); background: none; border-left: 0; border-right: 0; border-bottom: 0; text-align: left; cursor: pointer; width: 100%; border-radius: 0; transition: background .15s; }
+.item:first-child { border-top: 0; }
+.item:hover { background: var(--sub); }
+.item .when { font-size: 14px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.item .what { min-width: 0; }
+.item .preview { color: var(--ink-2); font-size: 15px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.item .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.item .site { font-weight: 700; font-size: 15px; }
+@media (max-width: 640px) { .item { grid-template-columns: 1fr; gap: 6px; } }
+.pager { display: flex; gap: 10px; justify-content: space-between; align-items: center; margin-top: 14px; }
+
+/* ---------- detail */
+.compare { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+@media (max-width: 900px) { .compare { grid-template-columns: 1fr; } }
+.orig { white-space: pre-wrap; color: var(--ink-2); font-size: 15px; line-height: 1.65; }
+.label-top { font-size: 13px; font-weight: 700; color: var(--ink-3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 10px; }
+.keypoint { background: var(--metal); color: var(--accent-ink); box-shadow: var(--edge); border-radius: var(--r-sm); padding: 10px 14px; font-weight: 700; margin-bottom: 14px; }
+.sec { margin-bottom: 14px; }
+.sec h4 { margin: 0 0 4px; font-size: 15px; color: var(--accent); }
+.sec ul { margin: 0; padding-left: 20px; }
+.sec li { margin: 2px 0; }
+.sec ul ul { margin-top: 2px; }
+.choices { margin: 6px 0 0; padding-left: 22px; }
+.choices li { margin: 4px 0; }
+.math { font-family: "Cambria Math", "STIX Two Math", serif; background: var(--sub); padding: 0 4px; border-radius: 4px; }
+.checks { display: grid; gap: 8px; }
+.check { display: flex; gap: 10px; align-items: flex-start; }
+.check svg { flex: none; margin-top: 3px; }
+.facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.facts div span { display: block; font-size: 13px; color: var(--ink-3); font-weight: 700; }
+pre.prompt { white-space: pre-wrap; font: 14px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--sub); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 14px; max-height: 480px; overflow: auto; margin: 0; }
+details summary { cursor: pointer; font-weight: 700; padding: 6px 0; }
+
+/* ---------- login */
+.login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.login .card { width: 100%; max-width: 400px; padding: 30px; }
+.login .brand { padding: 0 0 22px; }
+.err { color: var(--bad-ink); background: var(--bad-bg); border: 1px solid var(--bad-border); border-radius: var(--r-sm); padding: 8px 12px; margin-bottom: 14px; font-size: 15px; }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--card); padding: 10px 18px; border-radius: var(--r-md); font-weight: 700; box-shadow: var(--shadow); animation: up .25s var(--ease); z-index: 10; }
+@keyframes up { from { opacity: 0; transform: translate(-50%, 8px); } }
+.fade { animation: fade .25s var(--ease); }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } }
+.switch { display: flex; gap: 12px; align-items: flex-start; padding: 12px 0; border-top: 1px solid var(--border); }
+.switch:first-of-type { border-top: 0; }
+.switch input { width: 20px; height: 20px; accent-color: var(--accent); margin-top: 3px; flex: none; }
+.steps { margin: 0; padding-left: 22px; }
+.steps li { margin: 6px 0; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+(() => {
+  // ------------------------------------------------------------ tiny helpers
+  const $app = document.getElementById("app");
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // AI text may carry <b>/<i> emphasis markers and ⟦M1⟧ math tokens.
+  const rich = (s, math) => esc(s).replace(/&lt;(\/?)(b|i)&gt;/g, "<$1$2>").replace(/⟦M\d+⟧/g, (t) => math && math[t] ? `<span class="math">${esc(math[t])}</span>` : t);
+  const fmtN = (n) => Number(n || 0).toLocaleString();
+  const fmtMoney = (n) => n == null ? "—" : n < 0.01 && n > 0 ? "<$0.01" : "$" + n.toFixed(2);
+  const fmtSec = (ms) => ms ? (ms / 1000).toFixed(1) + "s" : "—";
+  const fmtWhen = (d) => { const x = new Date(d); return x.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " · " + x.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }); };
+  const fmtDay = (s) => new Date(s + "T12:00:00").toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  const ago = (d) => { if (!d) return "never"; const s = (Date.now() - new Date(d)) / 1000; if (s < 90) return "just now"; if (s < 3600) return Math.round(s / 60) + " min ago"; if (s < 86400) return Math.round(s / 3600) + " h ago"; return Math.round(s / 86400) + " days ago"; };
+  const ICONS = {
+    overview: '<path d="M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z"/>',
+    list: '<path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01"/>',
+    plug: '<path d="M9 7V3M15 7V3M7 7h10v4a5 5 0 0 1-10 0V7zM12 16v5"/>',
+    share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
+    gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
+    book: '<path d="M4 4h6a2 2 0 0 1 2 2v14a2 2 0 0 0-2-2H4zM20 4h-6a2 2 0 0 0-2 2v14a2 2 0 0 1 2-2h6z"/>',
+    check: '<path d="M20 6 9 17l-5-5"/>',
+    fix: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18v3h3l6.3-6.3a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/>',
+    alert: '<path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+    back: '<path d="M15 18l-6-6 6-6"/>',
+    copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/>',
+    out: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>',
+    moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
+    lines: '<path d="M4 7h16M4 12h10M4 17h13"/>',
+  };
+  const icon = (n, s = 18) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+  const toast = (msg) => { const t = document.createElement("div"); t.className = "toast"; t.setAttribute("role", "status"); t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2200); };
+  const copy = async (text) => { try { await navigator.clipboard.writeText(text); toast("Copied"); } catch (_) { toast("Select and copy it by hand"); } };
+
+  // theme (remembered on this browser only)
+  const root = document.documentElement;
+  try { const t = localStorage.getItem("dra-theme"); if (t) root.dataset.theme = t; } catch (_) {}
+  function toggleTheme() {
+    const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+    root.dataset.theme = dark ? "light" : "dark";
+    try { localStorage.setItem("dra-theme", root.dataset.theme); } catch (_) {}
+  }
+
+  // ------------------------------------------------------------ mode + api
+  const viewToken = (location.pathname.match(/^\/v\/([\w-]+)/) || [])[1] || null;
+  const VIEWER = !!viewToken;
+  async function api(path, opts = {}) {
+    const url = VIEWER ? `/api/view/${viewToken}${path.replace(/^\/rewrites\/(\d+)$/, "/rewrite/$1")}` : "/api" + path;
+    const res = await fetch(url, { method: opts.method || "GET", headers: opts.body ? { "content-type": "application/json" } : {}, body: opts.body ? JSON.stringify(opts.body) : undefined, credentials: "same-origin" });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 401 && !VIEWER && path !== "/login") { showLogin(); throw new Error("login"); }
+    if (!res.ok) throw new Error(data.error || "Something went wrong.");
+    return data;
+  }
+
+  const BRAND = `<div class="brand"><div class="mark">${icon("lines", 20)}</div><div><b>Dyslexia Reading Aid</b><span>${VIEWER ? "Shared view" : "Server dashboard"}</span></div></div>`;
+
+  // ------------------------------------------------------------ login
+  function showLogin(err) {
+    $app.innerHTML = `<div class="login"><form class="card fade" id="lf">${BRAND}
+      <h1 style="font-size:22px;margin-bottom:6px">Log in</h1><p class="muted" style="margin:0 0 18px">Use the dashboard password you set in Railway.</p>
+      <div id="lerr">${err ? `<div class="err">${esc(err)}</div>` : ""}</div>
+      <div class="field"><label for="pw">Password</label><input class="input" id="pw" type="password" autocomplete="current-password" required autofocus></div>
+      <button class="btn btn-primary" style="width:100%">Log in</button></form></div>`;
+    document.getElementById("lf").onsubmit = async (e) => {
+      e.preventDefault();
+      try { await api("/login", { method: "POST", body: { password: document.getElementById("pw").value } }); start(); }
+      catch (x) { document.getElementById("lerr").innerHTML = `<div class="err">${esc(x.message)}</div>`; }
+    };
+  }
+
+  // ------------------------------------------------------------ shell
+  const PAGES = VIEWER
+    ? [["overview", "Overview", "overview"], ["rewrites", "Rewrites", "list"], ["how", "How it works", "book"]]
+    : [["overview", "Overview", "overview"], ["rewrites", "Rewrites", "list"], ["connect", "Connect extension", "plug"], ["share", "Share a view", "share"], ["how", "How it works", "book"], ["settings", "Settings", "gear"]];
+  let info = {};
+  function shell() {
+    $app.innerHTML = `<div class="shell"><nav class="side" aria-label="Main">${BRAND}
+      ${PAGES.map(([id, label, ic]) => `<button class="nav" data-go="${id}">${icon(ic)}<span class="lbl">${label}</span></button>`).join("")}
+      <div class="side-foot"><button class="nav" id="theme">${icon("moon")}<span class="lbl">Light / dark</span></button>
+      ${VIEWER ? "" : `<button class="nav" id="logout">${icon("out")}<span class="lbl">Log out</span></button>`}</div></nav>
+      <main id="main" tabindex="-1"></main></div>`;
+    $app.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => go(b.dataset.go)));
+    document.getElementById("theme").onclick = toggleTheme;
+    const lo = document.getElementById("logout");
+    if (lo) lo.onclick = async () => { await api("/logout", { method: "POST" }).catch(() => {}); showLogin(); };
+  }
+  function go(page, arg) {
+    const h = arg ? `#${page}/${arg}` : `#${page}`;
+    if (location.hash !== h) history.pushState(null, "", h);
+    route();
+  }
+  window.addEventListener("popstate", route);
+  function route() {
+    const [page, arg] = (location.hash.slice(1) || "overview").split("/");
+    const known = PAGES.some((p) => p[0] === page) || page === "rewrite";
+    const cur = known ? page : "overview";
+    document.querySelectorAll("[data-go]").forEach((b) => b.setAttribute("aria-current", b.dataset.go === (cur === "rewrite" ? "rewrites" : cur) ? "page" : "false"));
+    const main = document.getElementById("main");
+    main.innerHTML = "";
+    const v = { overview, rewrites, rewrite, connect, share, how, settings }[cur];
+    v(main, arg).catch((e) => { if (e.message !== "login") main.innerHTML = `<div class="err">${esc(e.message)}</div>`; });
+    main.focus({ preventScroll: true });
+    window.scrollTo(0, 0);
+  }
+  const head = (title, sub, right = "") => `<div class="page-head"><div><h1>${title}</h1>${sub ? `<p>${sub}</p>` : ""}</div>${right}</div>`;
+  const viewerBanner = () => VIEWER ? `<div class="banner">${icon("share")}<div>Read-only view${info.ownerName ? ` of <b>${esc(info.ownerName)}</b>'s rewrites` : ""}, shared with <b>${esc(info.viewer || "you")}</b>. Every original is shown next to its rewrite.</div></div>` : "";
+
+  // ------------------------------------------------------------ overview
+  let days = 30;
+  async function overview(main) {
+    const s = await api(`/stats?days=${days}`);
+    const fresh = s.fresh || 0;
+    const pct = (n) => fresh ? Math.round((n / fresh) * 100) + "%" : "—";
+    main.innerHTML = viewerBanner() + head("Overview", `The last ${days} days`,
+      `<div class="seg" role="group" aria-label="Time range">${[7, 30, 90].map((d) => `<button data-d="${d}" aria-pressed="${d === days}">${d} days</button>`).join("")}</div>`) +
+      `<div class="grid tiles fade">
+        ${tile("Rewrites", fmtN(s.total), `${fmtN(s.questions)} questions · ${fmtN(s.reading)} reading`)}
+        ${tile("Passed every check", pct(s.clean), "on the first try")}
+        ${tile("Fixed automatically", fmtN(s.repaired), "patched with the original's words")}
+        ${tile("Average time", fmtSec(s.avg_ms), `${fmtN(s.cached)} came from saved results`)}
+        ${VIEWER ? "" : tile("Claude cost", fmtMoney(s.cost), `${fmtN(s.in_tok + s.out_tok)} tokens`)}
+      </div>
+      <div class="grid two fade">
+        <section class="card"><div class="card-head"><h2>Rewrites per day</h2><span class="muted small">${s.errors ? `${fmtN(s.errors)} failed` : "no failures"}</span></div>${s.total ? barChart(s.byDay) : emptyMsg()}</section>
+        <section class="card"><div class="card-head"><h2>Where</h2><span class="muted small">top sites</span></div>${s.bySite.length ? hbars(s.bySite) : emptyMsg()}</section>
+      </div>`;
+    main.querySelectorAll("[data-d]").forEach((b) => (b.onclick = () => { days = +b.dataset.d; overview(main); }));
+    wireChart(main);
+  }
+  const tile = (k, v, h) => `<div class="card tile"><div class="k">${k}</div><div class="v">${v}</div><div class="h">${h}</div></div>`;
+  const emptyMsg = () => `<div class="empty"><b>Nothing yet</b>${VIEWER ? "No rewrites in this time range." : "Connect the extension, then rewrite something."}</div>`;
+
+  function barChart(rows) {
+    const W = 640, H = 220, L = 30, B = 26, T = 8;
+    const max = Math.max(1, ...rows.map((r) => r.n));
+    const nice = max <= 4 ? max : Math.ceil(max / 4) * 4;
+    const n = rows.length, slot = (W - L) / n, bw = Math.max(2, slot - 2);
+    const y = (v) => T + (H - T - B) * (1 - v / nice);
+    const ticks = [0, nice / 2, nice].filter((v, i, a) => a.indexOf(v) === i && Number.isInteger(v));
+    const label = (i) => i === 0 || i === n - 1 || i === Math.floor(n / 2);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Rewrites per day bar chart">`;
+    for (const t of ticks) svg += `<line class="grid-line" x1="${L}" x2="${W}" y1="${y(t)}" y2="${y(t)}"/><text class="axis" x="${L - 6}" y="${y(t) + 4}" text-anchor="end">${t}</text>`;
+    rows.forEach((r, i) => {
+      const x = L + i * slot + 1, top = y(r.n), h = H - B - top;
+      if (r.n) { const rr = Math.min(4, bw / 2, h); svg += `<rect class="hit" x="${x - 1}" y="${T}" width="${slot}" height="${H - B - T}" data-i="${i}"/><path class="bar" data-b="${i}" d="M${x},${H - B} V${top + rr} q0,-${rr} ${rr},-${rr} h${bw - 2 * rr} q${rr},0 ${rr},${rr} V${H - B} Z"/>`; }
+      else svg += `<rect class="hit" x="${x - 1}" y="${T}" width="${slot}" height="${H - B - T}" data-i="${i}"/>`;
+      if (label(i)) svg += `<text class="axis" x="${x + bw / 2}" y="${H - 6}" text-anchor="${i === 0 ? "start" : i === n - 1 ? "end" : "middle"}">${fmtDay(r.day)}</text>`;
+    });
+    svg += "</svg>";
+    return `<div class="chart" data-rows='${esc(JSON.stringify(rows))}'>${svg}<div class="tip" hidden></div></div>`;
+  }
+  function wireChart(main) {
+    const c = main.querySelector(".chart"); if (!c) return;
+    const rows = JSON.parse(c.dataset.rows), tip = c.querySelector(".tip");
+    c.querySelectorAll(".hit").forEach((h) => {
+      h.addEventListener("mouseenter", () => {
+        const i = +h.dataset.i, r = rows[i];
+        c.querySelectorAll(".bar.on").forEach((b) => b.classList.remove("on"));
+        const b = c.querySelector(`[data-b="${i}"]`); if (b) b.classList.add("on");
+        const box = h.getBoundingClientRect(), cb = c.getBoundingClientRect();
+        tip.textContent = `${fmtDay(r.day)}: ${r.n} rewrite${r.n === 1 ? "" : "s"}`;
+        tip.style.left = box.left - cb.left + box.width / 2 + "px"; tip.style.top = "40px"; tip.hidden = false;
+      });
+    });
+    c.addEventListener("mouseleave", () => { tip.hidden = true; c.querySelectorAll(".bar.on").forEach((b) => b.classList.remove("on")); });
+  }
+  function hbars(rows) {
+    const max = Math.max(...rows.map((r) => r.n));
+    return `<div class="hbars">${rows.map((r) => `<div class="hbar"><span class="name" title="${esc(r.site)}">${esc(r.site.replace(/^www\./, ""))}</span><span class="num">${fmtN(r.n)}</span><div class="track"><div class="fill" style="width:${(r.n / max) * 100}%"></div></div></div>`).join("")}</div>`;
+  }
+
+  // ------------------------------------------------------------ rewrites list
+  let listState = { q: "", kind: "", offset: 0 };
+  async function rewrites(main) {
+    main.innerHTML = viewerBanner() + head("Rewrites", "Every original, next to the rewrite that was shown. Newest first.") +
+      `<div class="toolbar"><input class="input" id="q" type="search" placeholder="Search text or site" value="${esc(listState.q)}" aria-label="Search">
+       <div class="seg" role="group" aria-label="Kind">${[["", "All"], ["question", "Questions"], ["reading", "Reading"]].map(([k, l]) => `<button data-k="${k}" aria-pressed="${listState.kind === k}">${l}</button>`).join("")}</div></div>
+       <section class="card" id="lc"><div class="empty">Loading…</div></section>`;
+    let t;
+    main.querySelector("#q").oninput = (e) => { clearTimeout(t); t = setTimeout(() => { listState = { ...listState, q: e.target.value, offset: 0 }; load(); }, 250); };
+    main.querySelectorAll("[data-k]").forEach((b) => (b.onclick = () => { listState = { ...listState, kind: b.dataset.k, offset: 0 }; main.querySelectorAll("[data-k]").forEach((x) => x.setAttribute("aria-pressed", x === b)); load(); }));
+    async function load() {
+      const lc = main.querySelector("#lc");
+      const p = new URLSearchParams({ limit: 30, offset: listState.offset }); if (listState.q) p.set("q", listState.q); if (listState.kind) p.set("kind", listState.kind);
+      const d = await api(`/rewrites?${p}`);
+      if (!d.rows.length) { lc.innerHTML = `<div class="empty"><b>No rewrites found</b>${listState.q ? "Try a different search." : VIEWER ? "" : "Rewrites from the extension show up here."}</div>`; return; }
+      lc.innerHTML = `<div class="list">${d.rows.map(itemRow).join("")}</div>
+        <div class="pager"><span class="muted small">${listState.offset + 1}–${listState.offset + d.rows.length} of ${fmtN(d.total)}</span>
+        <div class="row"><button class="btn btn-sm" id="prev" ${listState.offset ? "" : "disabled"}>Newer</button><button class="btn btn-sm" id="next" ${listState.offset + d.rows.length < d.total ? "" : "disabled"}>Older</button></div></div>`;
+      lc.querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => go("rewrite", b.dataset.id)));
+      lc.querySelector("#prev").onclick = () => { listState.offset = Math.max(0, listState.offset - 30); load(); };
+      lc.querySelector("#next").onclick = () => { listState.offset += 30; load(); };
+    }
+    await load();
+  }
+  const statusChip = (r) => r.status === "error" ? `<span class="chip bad">${icon("alert", 13)} Failed</span>`
+    : r.repaired ? `<span class="chip warn">${icon("fix", 13)} Fixed automatically</span>`
+    : r.self_fixed ? `<span class="chip">${icon("fix", 13)} AI fixed itself</span>`
+    : `<span class="chip good">${icon("check", 13)} Passed checks</span>`;
+  const kindChip = (k) => `<span class="chip accent">${k === "question" ? "Question" : "Reading"}</span>`;
+  const itemRow = (r) => `<button class="item" data-id="${r.id}"><span class="when">${fmtWhen(r.created_at)}</span>
+    <span class="what"><span class="meta"><span class="site">${esc((r.site || "Unknown site").replace(/^www\./, ""))}</span></span><span class="preview">${esc(r.summary || r.preview || "")}</span></span>
+    <span class="meta">${kindChip(r.kind)}${statusChip(r)}${r.cached ? '<span class="chip">Saved</span>' : ""}</span></button>`;
+
+  // ------------------------------------------------------------ one rewrite
+  async function rewrite(main, id) {
+    const r = await api(`/rewrites/${id}`);
+    const math = Object.fromEntries(((r.original && r.original.math) || []).map((m) => [m.token, m.text]));
+    const o = r.original || {}, s = r.result;
+    const first = r.first_problems || [], fin = r.final_problems || [];
+    main.innerHTML = viewerBanner() + `<button class="btn btn-sm" id="back" style="margin-bottom:16px">${icon("back", 16)} All rewrites</button>` +
+      head(esc((r.site || "Unknown site").replace(/^www\./, "")), esc(r.page_title || "") , `<div class="row">${kindChip(r.kind)}${statusChip(r)}</div>`) +
+      `<div class="compare fade">
+        <section class="card"><div class="label-top">Original</div><div class="orig">${rich(o.text, math)}</div>
+          ${o.choices && o.choices.length ? `<div class="label-top" style="margin-top:16px">Answer choices</div><ol class="choices">${o.choices.map((c) => `<li>${rich(c, math)}</li>`).join("")}</ol>` : ""}</section>
+        <section class="card"><div class="label-top">Rewrite that was shown</div>${s ? renderResult(s, math) : `<p class="muted">${r.status === "error" ? "No rewrite. " + esc(r.error || "") : "Text not kept."}</p>`}</section>
+      </div>
+      <section class="card fade" style="margin-top:16px"><div class="card-head"><h2>Automatic checks</h2></div>
+        <div class="checks">${checksBlock(r, first, fin)}</div></section>
+      <section class="card fade"><div class="card-head"><h2>Details</h2></div><div class="facts">
+        <div><span>When</span>${esc(new Date(r.created_at).toLocaleString())}</div>
+        <div><span>AI model</span>${esc(r.cached ? "Saved result" : r.model || "—")}</div>
+        <div><span>Time</span>${fmtSec(r.ms)}</div>
+        ${VIEWER ? "" : `<div><span>Tokens</span>${fmtN(r.input_tokens)} in · ${fmtN(r.output_tokens)} out</div><div><span>Cost</span>${fmtMoney(r.cost)}</div><div><span>From</span>${esc(r.connection || "—")}</div>`}
+      </div>${VIEWER ? "" : `<div class="row" style="margin-top:16px"><button class="btn btn-sm btn-danger" id="del">Delete this rewrite</button></div>`}</section>`;
+    main.querySelector("#back").onclick = () => go("rewrites");
+    const del = main.querySelector("#del");
+    if (del) del.onclick = async () => { if (!confirm("Delete this rewrite from the log?")) return; await api(`/rewrites/${id}`, { method: "DELETE" }); toast("Deleted"); go("rewrites"); };
+  }
+  function checksBlock(r, first, fin) {
+    if (r.status === "error") return `<div class="check">${icon("alert")}<div>The AI call failed, so nothing was shown. ${esc(r.error || "")}</div></div>`;
+    const ok = (t) => `<div class="check" style="color:var(--good-ink)">${icon("check")}<div style="color:var(--ink)">${t}</div></div>`;
+    const fx = (t) => `<div class="check" style="color:var(--warn-ink)">${icon("fix")}<div style="color:var(--ink)">${t}</div></div>`;
+    const base = "Every number, math expression and meaning-changing word (not, except, at least…) was compared with the original" + (r.kind === "question" ? ", and every answer choice was checked to be there, in the same order." : ".");
+    if (!first.length) return ok("Passed every check on the first try.") + `<p class="help" style="margin:4px 0 0">${base}</p>`;
+    let out = fx(`The first answer had ${first.length} problem${first.length === 1 ? "" : "s"}:`) + `<ul style="margin:0 0 6px 28px">${first.map((p) => `<li>${esc(p)}</li>`).join("")}</ul>`;
+    if (r.self_fixed && !fin.length) out += ok("The AI fixed them itself on the second try.");
+    else if (r.repaired) out += ok("Anything still wrong was patched in code: invented lines removed, and missing parts added back in the original's own words.");
+    return out + `<p class="help" style="margin:4px 0 0">${base}</p>`;
+  }
+  function renderResult(s, math) {
+    let h = s.summary ? `<div class="keypoint">${rich(s.summary, math)}</div>` : "";
+    for (const sec of s.sections || []) {
+      h += `<div class="sec"><h4>${rich(sec.heading, math)}</h4><ul>${(sec.points || []).map((p) => `<li>${rich(p.text, math)}${p.sub && p.sub.length ? `<ul>${p.sub.map((x) => `<li>${rich(x, math)}</li>`).join("")}</ul>` : ""}</li>`).join("")}</ul></div>`;
+    }
+    if (s.question && s.question.length) h += `<div class="sec"><h4>The question</h4><ul>${s.question.map((q) => `<li>${rich(q, math)}</li>`).join("")}</ul></div>`;
+    if (s.choices && s.choices.length) h += `<div class="sec"><h4>Answer choices</h4>${s.choices_intro ? `<p style="margin:0">${rich(s.choices_intro, math)}</p>` : ""}<ol class="choices">${s.choices.map((c) => `<li>${rich(c, math)}</li>`).join("")}</ol></div>`;
+    return h;
+  }
+
+  // ------------------------------------------------------------ connect
+  async function connect(main) {
+    const [list, st] = await Promise.all([api("/connections"), api("/settings")]);
+    main.innerHTML = head("Connect extension", "Each Chrome you use gets its own connection code.") +
+      (st.hasKey ? "" : `<div class="banner" style="background:var(--warn-bg);border-color:var(--warn-border);color:var(--warn-ink)">${icon("alert")}<div>The server has no Claude key yet. In Railway, open this service → <b>Variables</b> → add <b>ANTHROPIC_API_KEY</b>.</div></div>`) +
+      `<div class="grid two">
+        <section class="card fade"><h2 style="margin-bottom:12px">Steps</h2><ol class="steps">
+          <li>Make a connection code below, and copy it.</li>
+          <li>Open the extension's <b>Settings</b> → <b>AI</b> → <b>My server</b>.</li>
+          <li>Paste the <b>server address</b> and the <b>code</b>, then click <b>Test</b>.</li></ol>
+          <div class="field" style="margin-top:18px"><span class="lbl-strong">Server address</span><div class="row"><div class="code" style="flex:1">${esc(location.origin)}</div><button class="btn btn-sm" id="cpo">${icon("copy", 15)} Copy</button></div></div>
+        </section>
+        <section class="card fade"><h2 style="margin-bottom:12px">New connection code</h2>
+          <form id="nf"><div class="field"><label for="nn">Name</label><input class="input" id="nn" placeholder="Laptop Chrome" maxlength="80"><span class="help">So you know which device it is.</span></div>
+          <button class="btn btn-primary">Make code</button></form><div id="newcode"></div></section>
+      </div>
+      <section class="card fade" style="margin-top:16px"><div class="card-head"><h2>Active codes</h2></div><div id="cl"></div></section>`;
+    main.querySelector("#cpo").onclick = () => copy(location.origin);
+    main.querySelector("#nf").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await api("/connections", { method: "POST", body: { name: main.querySelector("#nn").value } });
+      main.querySelector("#newcode").innerHTML = `<div class="fade" style="margin-top:16px"><span class="lbl-strong">Your code — copy it now, it's only shown once</span><div class="row" style="margin-top:6px"><div class="code" style="flex:1">${esc(r.token)}</div><button class="btn btn-sm btn-primary" id="cpc">${icon("copy", 15)} Copy</button></div></div>`;
+      main.querySelector("#cpc").onclick = () => copy(r.token);
+      list.unshift(r); drawList();
+    };
+    function drawList() {
+      const el = main.querySelector("#cl");
+      el.innerHTML = list.length ? list.map((c) => `<div class="switch" style="align-items:center;justify-content:space-between"><div><b>${esc(c.name)}</b>${c.hint ? ` <span class="muted small">…${esc(c.hint)}</span>` : ""}<div class="help">Made ${ago(c.created_at)} · last used ${ago(c.last)}</div></div><button class="btn btn-sm btn-danger" data-rv="${c.id}">Turn off</button></div>`).join("")
+        : `<div class="empty"><b>No codes yet</b>Make one above.</div>`;
+      el.querySelectorAll("[data-rv]").forEach((b) => (b.onclick = async () => { if (!confirm("Turn off this code? That Chrome will stop using the server.")) return; await api(`/connections/${b.dataset.rv}`, { method: "DELETE" }); list.splice(list.findIndex((c) => c.id == b.dataset.rv), 1); drawList(); toast("Turned off"); }));
+    }
+    drawList();
+  }
+
+  // ------------------------------------------------------------ share
+  async function share(main) {
+    const list = await api("/viewers");
+    main.innerHTML = head("Share a view", "A private, read-only link for a professor or the disability office.") +
+      `<div class="grid two">
+        <section class="card fade"><h2 style="margin-bottom:12px">What they can see</h2><ul class="steps">
+          <li>The overview: how many rewrites, and how many passed the checks.</li>
+          <li>Every original next to the rewrite that was shown, with the check results.</li>
+          <li>The exact instructions the AI gets.</li></ul>
+          <p class="help">They can't change anything, see your costs, or make connection codes. Turn a link off any time.</p></section>
+        <section class="card fade"><h2 style="margin-bottom:12px">New link</h2>
+          <form id="vf"><div class="field"><label for="vn">Who it's for</label><input class="input" id="vn" placeholder="Services for Students with Disabilities" maxlength="80"></div>
+          <button class="btn btn-primary">Make link</button></form><div id="newlink"></div></section>
+      </div>
+      <section class="card fade" style="margin-top:16px"><div class="card-head"><h2>Active links</h2></div><div id="vl"></div></section>`;
+    main.querySelector("#vf").onsubmit = async (e) => {
+      e.preventDefault();
+      const r = await api("/viewers", { method: "POST", body: { name: main.querySelector("#vn").value } });
+      const link = `${location.origin}/v/${r.token}`;
+      main.querySelector("#newlink").innerHTML = `<div class="fade" style="margin-top:16px"><span class="lbl-strong">Link — copy it now, it's only shown once</span><div class="row" style="margin-top:6px"><div class="code" style="flex:1">${esc(link)}</div><button class="btn btn-sm btn-primary" id="cpl">${icon("copy", 15)} Copy</button></div></div>`;
+      main.querySelector("#cpl").onclick = () => copy(link);
+      list.unshift({ ...r, last: null }); drawList();
+    };
+    function drawList() {
+      const el = main.querySelector("#vl");
+      el.innerHTML = list.length ? list.map((c) => `<div class="switch" style="align-items:center;justify-content:space-between"><div><b>${esc(c.name)}</b><div class="help">Made ${ago(c.created_at)} · last opened ${ago(c.last)}</div></div><button class="btn btn-sm btn-danger" data-rv="${c.id}">Turn off</button></div>`).join("")
+        : `<div class="empty"><b>No links yet</b>Make one above.</div>`;
+      el.querySelectorAll("[data-rv]").forEach((b) => (b.onclick = async () => { if (!confirm("Turn off this link? It will stop working right away.")) return; await api(`/viewers/${b.dataset.rv}`, { method: "DELETE" }); list.splice(list.findIndex((c) => c.id == b.dataset.rv), 1); drawList(); toast("Turned off"); }));
+    }
+    drawList();
+  }
+
+  // ------------------------------------------------------------ how it works
+  async function how(main) {
+    const p = await api("/prompts");
+    main.innerHTML = viewerBanner() + head("How it works", "What happens to each piece of text, in order.") +
+      `<section class="card fade"><ol class="steps">
+        <li><b>The student picks the text.</b> Nothing is rewritten until they click.</li>
+        <li><b>The AI gets fixed instructions</b> (below) and the text. It is told to use short, plain sentences and keep every number, name and meaning-changing word.${" "}On questions it must not solve, hint, rule out choices or reorder them.</li>
+        <li><b>Code checks the rewrite</b> against the original: every number, math expression and word like "not" or "except" must still be there, nothing may be invented, and every answer choice must be there in the same order.</li>
+        <li><b>If a check fails</b>, the AI gets one try to fix it. Anything still wrong is patched in code with the original's own words.</li>
+        <li><b>The original wording</b> is one click away at all times, and answers are always marked on the real question.</li></ol></section>
+      <section class="card fade"><details open><summary>Instructions for questions (version ${esc(p.question.version)})</summary><pre class="prompt">${esc(p.question.text)}</pre></details></section>
+      <section class="card fade"><details><summary>Instructions for other reading (version ${esc(p.reading.version)})</summary><pre class="prompt">${esc(p.reading.text)}</pre></details></section>`;
+  }
+
+  // ------------------------------------------------------------ settings
+  async function settings(main) {
+    const s = await api("/settings");
+    main.innerHTML = head("Settings", "") + `<div class="grid two">
+      <section class="card fade"><form id="sf">
+        <div class="field"><label for="on">Your name</label><input class="input" id="on" value="${esc(s.ownerName)}" maxlength="80" placeholder="Shown on shared links"></div>
+        <div class="field"><label for="md">AI model</label><select class="input" id="md">
+          ${[["claude-haiku-4-5-20251001", "Claude Haiku 4.5 — fast, about $0.002 per rewrite"], ["claude-sonnet-5-5", "Claude Sonnet 5.5 — higher quality, costs more"]].map(([v, l]) => `<option value="${v}" ${s.model === v ? "selected" : ""}>${l}</option>`).join("")}
+          ${["claude-haiku-4-5-20251001", "claude-sonnet-5-5"].includes(s.model) ? "" : `<option value="${esc(s.model)}" selected>${esc(s.model)}</option>`}
+        </select></div>
+        <label class="switch"><input type="checkbox" id="kt" ${s.keepText ? "checked" : ""}><span><b>Keep the text in the log</b><br><span class="help">Needed for the side-by-side view and shared links. Off = only counts and check results are kept.</span></span></label>
+        <label class="switch"><input type="checkbox" id="pz" ${s.paused ? "checked" : ""}><span><b>Pause the server</b><br><span class="help">The extension falls back to the free on-device model.</span></span></label>
+        <button class="btn btn-primary" style="margin-top:8px">Save</button></form></section>
+      <section class="card fade"><h2 style="margin-bottom:12px">Status</h2>
+        <div class="checks">
+          <div class="check" style="color:${s.hasKey ? "var(--good-ink)" : "var(--warn-ink)"}">${icon(s.hasKey ? "check" : "alert")}<div style="color:var(--ink)">${s.hasKey ? "Claude key is set on the server." : "No Claude key. Add ANTHROPIC_API_KEY in Railway → Variables."}</div></div>
+          <div class="check" style="color:var(--good-ink)">${icon("check")}<div style="color:var(--ink)">Database connected.</div></div></div>
+        <h2 style="margin:22px 0 10px">Clear the log</h2><p class="help" style="margin-top:0">Deletes every logged rewrite and every saved result. Can't be undone.</p>
+        <button class="btn btn-danger" id="wipe">Delete everything</button></section></div>`;
+    main.querySelector("#sf").onsubmit = async (e) => {
+      e.preventDefault();
+      await api("/settings", { method: "PUT", body: { ownerName: main.querySelector("#on").value, model: main.querySelector("#md").value, keepText: main.querySelector("#kt").checked, paused: main.querySelector("#pz").checked } });
+      toast("Saved");
+    };
+    main.querySelector("#wipe").onclick = async () => { if (!confirm("Delete every logged rewrite? This can't be undone.")) return; await api("/rewrites", { method: "DELETE" }); toast("Log cleared"); };
+  }
+
+  // ------------------------------------------------------------ start
+  async function start() {
+    try {
+      if (VIEWER) info = await api("/info");
+      else { const me = await api("/me"); if (!me.loggedIn) return showLogin(me.passwordSet ? "" : "Set DASHBOARD_PASSWORD in Railway → Variables, then log in."); }
+    } catch (e) {
+      if (e.message === "login") return;
+      $app.innerHTML = `<div class="login"><div class="card">${BRAND}<div class="err">${esc(e.message)}</div></div></div>`; return;
+    }
+    shell(); route();
+  }
+  start();
+})();
+</script>
+</body>
+</html>

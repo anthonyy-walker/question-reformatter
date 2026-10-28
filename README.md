@@ -50,6 +50,21 @@ Don't remove the extension. Replace the files in the same folder (`git pull`), t
   2. Anything still wrong is patched: lines with invented numbers are removed, and anything left out is added back in the original's own words. On Gradescope, any answer choice that lost something goes back to its original wording.
 - Text from websites is treated as material only — instructions hidden inside a page are ignored.
 
+## Your own server (optional)
+The `server/` folder is a small server with a dashboard, made for Railway. It is not part of the extension; Chrome ignores it.
+
+- **What it does:** the extension sends text to your server. The server holds the Claude key, runs the same instructions and checks, and logs every rewrite.
+- **Dashboard:**
+  - Overview: rewrites per day, sites, how many passed the checks, cost.
+  - Rewrites: every original next to the rewrite that was shown, with the check results.
+  - Connect extension: make a connection code for each Chrome.
+  - Share a view: a private, read-only link for a professor or the disability office (no costs, no changes).
+  - Settings: model, pause, keep or drop the text, clear the log.
+- **In the extension:** Settings → AI → **My server** → paste the server address and connection code → Test → Save.
+  - If the server can't be reached, the free on-device model is used.
+- **Railway variables:** `DATABASE_URL` (from the Postgres service), `DASHBOARD_PASSWORD`, `ANTHROPIC_API_KEY`.
+- **Test:** `TEST_DATABASE_URL=postgres://… npm test`
+
 ## Saved results (no repeat cost)
 - Every result is saved on this device. Reformatting the same text again costs nothing.
 - On Gradescope, panels you had open re-appear when you return. A return visit never calls the AI on its own.

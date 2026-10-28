@@ -50,7 +50,7 @@
     return svg;
   }
 
-  const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [], provider: "local", prefetch: true };
+  const DEFAULTS = { textSize: "normal", theme: "light", apiKey: "", model: "claude-haiku-4-5-20251001", suggest: true, offSites: [], provider: "local", prefetch: true, serverUrl: "", serverCode: "" };
   const FIELDS = Object.keys(DEFAULTS);
 
   function load() {
@@ -80,6 +80,7 @@
         h("div.qr-mode-grid", {}, [
           ["local", "Free — on this computer", "Chrome's built-in model (Gemini Nano). No cost, works offline, text never leaves your computer. If it struggles and a Claude key is set, Claude takes over for that one."],
           ["claude", "Claude", "Best quality. Uses your API key; about $0.002 per rewrite."],
+          ["server", "My server", "Claude through your own server. Every rewrite is logged to your dashboard, where you can share a read-only view. No key on this computer."],
         ].map(([k, name, desc]) => {
           const on = providerOn === k;
           return h(`button.qr-btn.qr-mode${on ? ".qr-on" : ""}`, { role: "radio", "aria-checked": String(on), onclick: () => { draft.provider = k; render(); } },
@@ -149,6 +150,26 @@
           return o;
         }));
 
+      // Your own server (Railway): address + connection code from the dashboard
+      const srvStatus = h("span.qr-help", { role: "status" }, draft.serverUrl ? "" : "Get both from your dashboard → Connect extension.");
+      const srvUrl = h("input.qr-input", { type: "url", placeholder: "https://….up.railway.app", autocomplete: "off", value: draft.serverUrl, oninput: (e) => { draft.serverUrl = e.target.value.trim().replace(/\/+$/, ""); } });
+      const srvCode = h("input.qr-input", { type: "password", placeholder: "dra_…", autocomplete: "off", value: draft.serverCode, oninput: (e) => { draft.serverCode = e.target.value.trim(); } });
+      const srvTest = h("button.qr-btn", { onclick: () => {
+        srvStatus.textContent = "Testing…";
+        chrome.runtime.sendMessage({ type: "QR_SERVER_TEST", url: draft.serverUrl, code: draft.serverCode }, (r) => {
+          if (!r || !r.ok) { srvStatus.textContent = "Couldn't connect: " + (r ? r.error : "no answer"); return; }
+          const x = r.result;
+          srvStatus.textContent = `Connected as "${x.name}".` + (x.paused ? " The server is paused." : "") + (x.hasKey ? "" : " The server has no Claude key yet.") + " Click Save to keep it.";
+        });
+      } }, "Test");
+      const server = h("div.qr-fieldset", {},
+        h("div.qr-legend", { text: "My server" }),
+        h("div.qr-two", {},
+          h("label.qr-field", {}, h("span.qr-legend", { text: "Server address" }), srvUrl),
+          h("label.qr-field", {}, h("span.qr-legend", { text: "Connection code" }), srvCode)),
+        h("div.qr-saved-row", {}, srvTest, srvStatus),
+        h("span.qr-help", { text: "When this is set, \"Reword\" and the backup use your server instead of the key below. If the server can't be reached, the free on-device model is used." }));
+
       const fields = h("div.qr-two", {},
         h("label.qr-field", {}, h("span.qr-legend", { text: "API key" }), key, h("span.qr-help", { text: "Optional with the free model (used as backup). Stored on this device only. Sent only to api.anthropic.com." })),
         h("label.qr-field", {}, h("span.qr-legend", { text: "Model" }), model, h("span.qr-help", { text: "Haiku is plenty for most text." })));
@@ -191,7 +212,7 @@
         chrome.storage.local.set(draft, () => { status.textContent = "Saved"; opts.onSaved && opts.onSaved({ ...draft }); });
       } }, "Save");
 
-      card.append(head, provider, suggest,
+      card.append(head, provider, server, suggest,
         seg("Text size", "textSize", [["normal", "Normal", 16], ["larger", "Larger", 20], ["largest", "Largest", 24]]),
         seg("Theme", "theme", [["light", "Light"], ["dark", "Dark"]]),
         fields, saved, instr,

@@ -1,0 +1,16 @@
+{
+  "name": "dyslexia-reading-aid-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Server and dashboard for the Dyslexia Reading Aid Chrome extension. The extension itself does not need this file.",
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node server/test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
